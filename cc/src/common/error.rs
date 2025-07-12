@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use crate::{lex, parse};
+use crate::{lex, ast};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

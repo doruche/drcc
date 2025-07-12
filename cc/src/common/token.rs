@@ -1,6 +1,6 @@
 //! Token, and tokens' types used in relevant stages of the compiler.
 
-use crate::{common::span::Span, span};
+use crate::{common::{span::Span, BinaryOp, StrDescriptor}, span};
 
 /// Token without any additional information.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,6 +8,9 @@ pub enum RawToken {
     // no-lexeme tokens
     LParen, RParen,
     LBrace, RBrace,
+    Tilde, Hyphen, DoubleHyphen,
+    Plus, DoublePlus,
+    Asterisk, ForwardSlash, Percent,
     Semicolon,
     Return, Int, Void,
 
@@ -15,7 +18,7 @@ pub enum RawToken {
     // [0-9]+
     Integer(i64),
     // [a-zA-Z_][a-zA-Z0-9_]*
-    Identifier(String),
+    Identifier(StrDescriptor),
 
     Nothing,
 }
@@ -26,6 +29,14 @@ pub enum TokenType {
     RParen,
     LBrace,
     RBrace,
+    Tilde,
+    Hyphen,
+    Plus,
+    DoublePlus,
+    DoubleHyphen,
+    Asterisk,
+    ForwardSlash,
+    Percent,
     Semicolon,
     Return,
     Int,
@@ -53,6 +64,14 @@ impl Token {
             RawToken::RParen => TokenType::RParen,
             RawToken::LBrace => TokenType::LBrace,
             RawToken::RBrace => TokenType::RBrace,
+            RawToken::Tilde => TokenType::Tilde,
+            RawToken::Hyphen => TokenType::Hyphen,
+            RawToken::DoubleHyphen => TokenType::DoubleHyphen,
+            RawToken::Plus => TokenType::Plus,
+            RawToken::DoublePlus => TokenType::DoublePlus,
+            RawToken::Asterisk => TokenType::Asterisk,
+            RawToken::ForwardSlash => TokenType::ForwardSlash,
+            RawToken::Percent => TokenType::Percent,
             RawToken::Semicolon => TokenType::Semicolon,
             RawToken::Return => TokenType::Return,
             RawToken::Int => TokenType::Int,
@@ -69,6 +88,26 @@ impl Token {
             self.get_type(),
             Int | Void
         )
+    }
+
+    pub fn is_binary_op(&self) -> bool {
+        use TokenType::*;
+        matches!(
+            self.get_type(),
+            Plus | Hyphen | Asterisk | ForwardSlash | Percent
+        )
+    }
+
+    pub fn to_binary_op(&self) -> BinaryOp {
+        use TokenType::*;
+        match self.get_type() {
+            Plus => BinaryOp::Add,
+            Hyphen => BinaryOp::Sub,
+            Asterisk => BinaryOp::Mul,
+            ForwardSlash => BinaryOp::Div,
+            Percent => BinaryOp::Rem,
+            _ => panic!("Internal error: expected a binary operator token, found {:?}", self),
+        }
     }
 
     pub fn take(&mut self) -> Self {
@@ -94,7 +133,7 @@ impl RawToken {
         }
     }
 
-    pub fn as_identifier(self) -> String {
+    pub fn as_identifier(self) -> StrDescriptor {
         if let RawToken::Identifier(val) = self {
             val
         } else {

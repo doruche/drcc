@@ -1,8 +1,9 @@
 #![allow(unused)]
 
 mod lex;
-mod parse;
-mod codegen;
+mod ast;
+mod tac;
+mod asm;
 mod common;
 #[macro_use]
 mod macros;

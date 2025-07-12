@@ -1,4 +1,4 @@
-use crate::{common::{Error, RawToken, Result, Span, Token}, span};
+use crate::{common::{Error, RawToken, Result, Span, StringPool, Token}, span};
 
 
 /// Lexer can only ensure proper tokenization for valid ASCII characters, for now.
@@ -9,6 +9,7 @@ pub struct Lexer {
     has_error: bool,
     cur_line: usize,
     cur_column: usize,
+    pool: StringPool,
 }
 
 impl Lexer {
@@ -20,10 +21,11 @@ impl Lexer {
             has_error: false,
             cur_line: 1,
             cur_column: 1,
+            pool: StringPool::new(),
         }
     }
 
-    pub fn lex(mut self) -> Result<Vec<Token>> {
+    pub fn lex(mut self) -> Result<(Vec<Token>, StringPool)> {
         let mut tokens = vec![];
         let mut errors = vec![];
         loop {
@@ -42,7 +44,7 @@ impl Lexer {
         if self.has_error {
             Err(Error::Errors(errors.into()))
         } else {
-            Ok(tokens)
+            Ok((tokens, self.pool))
         }
     }
 
@@ -132,12 +134,13 @@ impl Lexer {
         );
 
         let identifier_str: String = self.input[start_position..self.position].iter().collect();
+        let sd = self.pool.intern(identifier_str.clone());
 
         match identifier_str.as_str() {
             "return" => Ok(Token::new(RawToken::Return, span)),
             "int" => Ok(Token::new(RawToken::Int, span)),
             "void" => Ok(Token::new(RawToken::Void, span)),
-            _ => Ok(Token::new(RawToken::Identifier(identifier_str), span)),
+            _ => Ok(Token::new(RawToken::Identifier(sd), span)),
         }
     }
 
@@ -167,7 +170,8 @@ impl Lexer {
         let cur_char = self.peek().unwrap();
         let start_line = self.cur_line;
         let start_column = self.cur_column;
-        
+        let mut span = span!(start_line, start_column, 1);
+
         let raw = match cur_char {
             '(' =>  {
                 self.advance();
@@ -185,10 +189,47 @@ impl Lexer {
                 self.advance();
                 RBrace
             },
+            '~' => {
+                self.advance();
+                Tilde
+            },
             ';' => {
                 self.advance();
                 Semicolon
             },
+            '*' => {
+                self.advance();
+                Asterisk
+            },
+            '/' => {
+                // comments will be adder later
+                self.advance();
+                ForwardSlash
+            },
+            '%' => {
+                self.advance();
+                Percent
+            }
+            '+' => {
+                self.advance();
+                if self.peek() == Some('+') {
+                    self.advance();
+                    span.length = Some(2);
+                    DoublePlus
+                } else {
+                    Plus
+                }
+            }
+            '-' => {
+                self.advance();
+                if self.peek() == Some('-') {
+                    self.advance();
+                    span.length = Some(2);
+                    DoubleHyphen
+                } else {
+                    Hyphen
+                }
+            }
             '0'..='9' => return self.integer().map(|token| Some(token)),
             'a'..='z' | 'A'..='Z' | '_' => return self.identifier().map(|token| Some(token)),
             _ => {
@@ -197,7 +238,6 @@ impl Lexer {
                 return Err(Error::Lex(format!("Unexpected character: '{}'", cur_char)));
             }
         };
-        let span = span!(start_line, start_column);
 
         Ok(Some(Token::new(raw, span)))
     }

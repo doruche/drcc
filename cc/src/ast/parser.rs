@@ -1,4 +1,4 @@
-use crate::{common::{Error, Result, Token, TokenType}, parse::{Expr, Stmt}};
+use crate::{ast::{Expr, Stmt, TopDeclaration, TopLevel}, common::{DataType, Error, RawToken, Result, Token, TokenType}};
 
 #[derive(Debug)]
 pub struct Parser {
@@ -16,12 +16,12 @@ impl Parser {
         }
     }
 
-    pub fn parse_prog(&mut self) -> Result<Stmt> {
-        let mut prog = vec![];
+    pub fn parse_prog(&mut self) -> Result<TopLevel> {
+        let mut decls = vec![];
         let mut errors = vec![];
         while !self.is_at_end() {
-            match self.declaration() {
-                Ok(stmt) => prog.push(stmt),
+            match self.top_decl() {
+                Ok(decl) => decls.push(decl),
                 Err(e) => {
                     errors.push(e);
                     self.has_error = true;
@@ -32,15 +32,15 @@ impl Parser {
         if self.has_error {
             Err(Error::Errors(errors))
         } else {
-            Ok(Stmt::Program(prog))
+            Ok(TopLevel { decls })
         }
     }
 
     pub fn parse_expr(&mut self) -> Result<Expr> {
-        self.primary()
+        self.expr_top_level()
     }
 
-    fn is_at_end(&self) -> bool {
+    pub(super) fn is_at_end(&self) -> bool {
         self.position >= self.input.len()
     }
 
@@ -93,6 +93,40 @@ impl Parser {
             } else {
                 break;
             }
+        }
+    }
+
+    fn top_decl(&mut self) -> Result<TopDeclaration> {
+        // currently, only function declarations are supported
+        let type_token = self.eat_current();
+        match type_token.get_type() {
+            TokenType::Int => {
+                let name_token = self.eat(TokenType::Identifier, "Expected an identifier for function declaration.")?;
+                let name_span = name_token.span;
+                let name_str = match name_token.inner {
+                    RawToken::Identifier(str) => str,
+                    _ => return Err(Error::Parse("Expected an identifier for function declaration.".into())),
+                };
+                
+                self.eat(TokenType::LParen, "Expected '(' after function name.")?;
+                // currently, only void parameters are supported
+                self.eat(TokenType::Void, "Expected 'void' for function parameters.")?;
+                self.eat(TokenType::RParen, "Expected ')' after function parameters.")?;
+                self.eat(TokenType::LBrace, "Expected '{' to start function body.")?;
+                
+                let mut body = vec![];
+                while !self.is_at_end() && self.peek().unwrap().get_type() != TokenType::RBrace {
+                    body.push(self.stmt_top_level()?);
+                }
+
+                self.eat(TokenType::RBrace, "Expected '}' to end function body.")?;
+                Ok(TopDeclaration::FuncDecl {
+                    return_type: (DataType::Int, type_token.span),
+                    name: (name_str, name_span),
+                    body,
+                })
+            },
+            _ => Err(Error::Parse("Expected a type for function declaration.".into())),
         }
     }
 }

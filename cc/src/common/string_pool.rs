@@ -1,0 +1,48 @@
+//! String pool for interning strings.
+//! This module provides a simple string pool to avoid duplicating strings in memory.
+
+use std::collections::HashMap;
+
+#[derive(Debug)]
+pub struct StringPool {
+    pool: HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub struct StrDescriptor(usize);
+
+impl StrDescriptor {
+    pub fn new(index: usize) -> Self {
+        StrDescriptor(index)
+    }
+
+    pub fn index(&self) -> usize {
+        self.0
+    }
+}
+
+impl StringPool {
+    pub fn new() -> Self {
+        Self {
+            pool: HashMap::new(),
+        }
+    }
+
+    pub fn intern(&mut self, string: String) -> StrDescriptor {
+        let index = self.pool.len();
+        if !self.pool.contains_key(&string) {
+            self.pool.insert(string, index);
+        }
+        StrDescriptor(index)
+    }
+
+    pub fn get(&self, descriptor: StrDescriptor) -> Option<&String> {
+        self.pool.iter().find_map(|(key, &value)| {
+            if value == descriptor.index() {
+                Some(key)
+            } else {
+                None
+            }
+        })
+    }
+}
