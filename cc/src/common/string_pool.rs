@@ -45,4 +45,15 @@ impl StringPool {
             }
         })
     }
+
+    pub fn dump(&self) -> String {
+        let mut strings = self.pool
+            .iter()
+            .collect::<Vec<_>>();
+        strings.sort_by(|a, b| a.1.cmp(b.1));
+        strings.iter()
+            .map(|(str, idx)| format!("[{}]: {}", idx, str))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }

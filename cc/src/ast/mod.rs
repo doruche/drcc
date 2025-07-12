@@ -60,9 +60,12 @@ mod tests {
 
     #[test]
     fn test_binary() {
-        let input = "int main(void) { return 1 * 2 - 3 * (4 + 5); }";
+        let input = "int main(void) { return 1 <= 3 + 4 * 2 && 3 > 1; }";
         let mut lexer = Lexer::new(input.into());
         let (tokens, pool) = lexer.lex().unwrap();
+        // for token in &tokens {
+        //     println!("{}", token);
+        // }
         let mut parser = Parser::new(tokens);
         match parser.parse_prog() {
             Ok(stmt) => {

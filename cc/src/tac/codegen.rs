@@ -1,17 +1,15 @@
-use crate::{ast::{self, Expr, Stmt}, common::Result, tac::{Function, Insn, Operand, TopLevel}};
+use crate::{ast::{self, Expr, Stmt}, common::{BinaryOp, Result}, tac::{Function, Insn, Operand, TopLevel}};
 
 
 #[derive(Debug)]
 pub struct Parser {
     ast: ast::TopLevel,
-    next_temp_id: usize,
 }
 
 impl Parser {
     pub fn new(ast: ast::TopLevel) -> Self {
         Self {
             ast,
-            next_temp_id: 0,
         }
     }
 
@@ -26,8 +24,10 @@ impl Parser {
                     body 
                 } => {
                     let mut body_insns = vec![];
+                    let mut next_temp_id = 0;
+                    let mut next_label_id = 0;
                     for stmt in body {
-                        let insns = parse_stmt(stmt, &mut self.next_temp_id)?;
+                        let insns = parse_stmt(stmt, &mut next_temp_id, &mut next_label_id)?;
                         body_insns.extend(insns);
                     }
                     top_delcs.push(Function {
@@ -44,11 +44,15 @@ impl Parser {
     }
 }
 
-pub(super) fn parse_stmt(stmt: Stmt, next_temp_id: &mut usize) -> Result<Vec<Insn>> {
+pub(super) fn parse_stmt(
+    stmt: Stmt, 
+    next_temp_id: &mut usize,
+    next_label_id: &mut usize
+) -> Result<Vec<Insn>> {
     let mut top_insns = vec![];
     match stmt {
         Stmt::Return { span, expr } => {
-            let (operand, insns) = parse_expr(*expr, next_temp_id)?;
+            let (operand, insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
                 let insn = Insn::Return(Some(operand));
                 let insns = match insns {
                     Some(mut vec) => {
@@ -64,13 +68,17 @@ pub(super) fn parse_stmt(stmt: Stmt, next_temp_id: &mut usize) -> Result<Vec<Ins
 }
 
 /// Returns the destination operand and any generated instructions.
-pub(super) fn parse_expr(expr: Expr, next_temp_id: &mut usize) -> Result<(Operand, Option<Vec<Insn>>)> {
+pub(super) fn parse_expr(
+    expr: Expr, 
+    next_temp_id: &mut usize,
+    next_label_id: &mut usize,
+) -> Result<(Operand, Option<Vec<Insn>>)> {
     match expr {
         Expr::IntegerLiteral(val) => {
             Ok((Operand::Imm(val), None))
         },
         Expr::Unary((op, span), expr) => {
-            let (src, mut insns) = parse_expr(*expr, next_temp_id)?;
+            let (src, mut insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
             let temp_id = *next_temp_id;
             *next_temp_id += 1;
             let insn = Insn::Unary {
@@ -88,28 +96,101 @@ pub(super) fn parse_expr(expr: Expr, next_temp_id: &mut usize) -> Result<(Operan
             Ok((Operand::Temp(temp_id), insns))
         }
         Expr::Group(inner) => {
-            parse_expr(*inner, next_temp_id)
+            parse_expr(*inner, next_temp_id, next_label_id)
         }
         Expr::Binary { op: (op, span), left, right } => {
-            let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id)?;
-            let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id)?;
-            let temp_id = *next_temp_id;
-            *next_temp_id += 1;
-            let insn = Insn::Binary {
-                op,
-                left: left_operand,
-                right: right_operand,
-                dst: Operand::Temp(temp_id),
-            };
-            let mut insns = vec![];
-            if let Some(left_insns) = left_insns {
-                insns.extend(left_insns);
+            use BinaryOp::*;
+            match op {
+                And|Or => {
+                    let mut top_insns = vec![];
+                    let short_lable = *next_label_id;
+                    let end_lable = *next_label_id + 1;
+                    *next_label_id += 2;
+
+                    let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
+                    if let Some(left_insns) = left_insns {
+                        top_insns.extend(left_insns);
+                    }
+                    if let And = op {
+                        top_insns.push(Insn::BranchIfZero {
+                            src: left_operand,
+                            label: short_lable,
+                        });
+                    } else {
+                        top_insns.push(Insn::BranchNotZero {
+                            src: left_operand,
+                            label: short_lable,
+                        });
+                    }
+
+                    let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
+                    if let Some(right_insns) = right_insns {
+                        top_insns.extend(right_insns);
+                    }
+                    if let And = op {
+                        top_insns.push(Insn::BranchIfZero {
+                            src: right_operand,
+                            label: short_lable,
+                        });
+                    } else {
+                        top_insns.push(Insn::BranchNotZero {
+                            src: right_operand,
+                            label: short_lable,
+                        });
+                    }
+                    let result_operand = Operand::Temp(*next_temp_id);
+                    *next_temp_id += 1;
+                    if let And = op {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(1),
+                            dst: result_operand,
+                        });
+                    } else {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(0),
+                            dst: result_operand,
+                        });
+                    }
+                    top_insns.push(Insn::Jump(end_lable));
+                    top_insns.push(Insn::Label(short_lable));
+                    if let And = op {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(0),
+                            dst: result_operand,
+                        });
+                    } else {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(1),
+                            dst: result_operand,
+                        });
+                    }
+                    top_insns.push(Insn::Label(end_lable));
+                    Ok((result_operand, Some(top_insns)))
+                },
+                Add|Sub|Mul|Div|Rem|
+                LessThan|GreaterThan|
+                GtEq|LtEq|Equal|NotEqual => {
+                    let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
+                    let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
+                    let temp_id = *next_temp_id;
+                    *next_temp_id += 1;
+                    let insn = Insn::Binary {
+                        op,
+                        left: left_operand,
+                        right: right_operand,
+                        dst: Operand::Temp(temp_id),
+                    };
+                    let mut insns = vec![];
+                    if let Some(left_insns) = left_insns {
+                        insns.extend(left_insns);
+                    }
+                    if let Some(right_insns) = right_insns {
+                        insns.extend(right_insns);
+                    }
+                    insns.push(insn);
+                    Ok((Operand::Temp(temp_id), Some(insns)))
+                },
             }
-            if let Some(right_insns) = right_insns {
-                insns.extend(right_insns);
-            }
-            insns.push(insn);
-            Ok((Operand::Temp(temp_id), Some(insns)))
         }
     }
 }

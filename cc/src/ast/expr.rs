@@ -53,6 +53,7 @@ impl Parser {
                 TokenType::Hyphen => UnaryOp::Negate,
                 TokenType::Plus => UnaryOp::Pos,
                 TokenType::Tilde => UnaryOp::Complement,
+                TokenType::Bang => UnaryOp::Not,
                 _ => unreachable!(),
             };
             let span = op_token.span;

@@ -16,7 +16,7 @@ mod tests {
 
     #[test]
     fn test_basic() {
-        let input = read_to_string("../testprogs/return_2.c").unwrap();
+        let input = read_to_string("../testprogs/basic.c").unwrap();
         let lexer = Lexer::new(input);
         match lexer.lex() {
             Ok((tokens, pool)) => {

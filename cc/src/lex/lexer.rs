@@ -134,13 +134,15 @@ impl Lexer {
         );
 
         let identifier_str: String = self.input[start_position..self.position].iter().collect();
-        let sd = self.pool.intern(identifier_str.clone());
 
         match identifier_str.as_str() {
             "return" => Ok(Token::new(RawToken::Return, span)),
             "int" => Ok(Token::new(RawToken::Int, span)),
             "void" => Ok(Token::new(RawToken::Void, span)),
-            _ => Ok(Token::new(RawToken::Identifier(sd), span)),
+            _ => {
+                let sd = self.pool.intern(identifier_str.clone());
+                Ok(Token::new(RawToken::Identifier(sd), span))
+            },
         }
     }
 
@@ -210,6 +212,66 @@ impl Lexer {
                 self.advance();
                 Percent
             }
+            '!' => {
+                self.advance();
+                if self.peek() == Some('=') {
+                    self.advance();
+                    span.length = Some(2);
+                    NotEqual
+                } else {
+                    Bang
+                }
+            },
+            '>' => {
+                self.advance();
+                if self.peek() == Some('=') {
+                    self.advance();
+                    span.length = Some(2);
+                    GtEq
+                } else {
+                    GreaterThan
+                }
+            },
+            '<' => {
+                self.advance();
+                if self.peek() == Some('=') {
+                    self.advance();
+                    span.length = Some(2);
+                    LtEq
+                } else {
+                    LessThan
+                }
+            },
+            '&' => {
+                self.advance();
+                if self.peek() == Some('&') {
+                    self.advance();
+                    span.length = Some(2);
+                    DoubleAnd
+                } else {
+                    And
+                }
+            },
+            '|' => {
+                self.advance();
+                if self.peek() == Some('|') {
+                    self.advance();
+                    span.length = Some(2);
+                    DoubleOr
+                } else {
+                    Or
+                }
+            },
+            '=' => {
+                self.advance();
+                if self.peek() == Some('=') {
+                    self.advance();
+                    span.length = Some(2);
+                    DoubleEqual
+                } else {
+                    Equal
+                }
+            },
             '+' => {
                 self.advance();
                 if self.peek() == Some('+') {

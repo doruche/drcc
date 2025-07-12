@@ -1,5 +1,7 @@
 //! Token, and tokens' types used in relevant stages of the compiler.
 
+use std::fmt::Display;
+
 use crate::{common::{span::Span, BinaryOp, StrDescriptor}, span};
 
 /// Token without any additional information.
@@ -11,7 +13,9 @@ pub enum RawToken {
     Tilde, Hyphen, DoubleHyphen,
     Plus, DoublePlus,
     Asterisk, ForwardSlash, Percent,
-    Semicolon,
+    Semicolon, Bang, And, Equal,
+    LessThan, GreaterThan, NotEqual,
+    GtEq, LtEq, Or, DoubleOr, DoubleAnd, DoubleEqual,
     Return, Int, Void,
 
 
@@ -38,6 +42,18 @@ pub enum TokenType {
     ForwardSlash,
     Percent,
     Semicolon,
+    Bang,
+    And,
+    DoubleAnd,
+    Or,
+    DoubleOr,
+    Equal,
+    DoubleEqual,
+    LessThan,
+    GreaterThan,
+    GtEq,
+    LtEq,
+    NotEqual,
     Return,
     Int,
     Void,
@@ -73,6 +89,18 @@ impl Token {
             RawToken::ForwardSlash => TokenType::ForwardSlash,
             RawToken::Percent => TokenType::Percent,
             RawToken::Semicolon => TokenType::Semicolon,
+            RawToken::Bang => TokenType::Bang,
+            RawToken::And => TokenType::And,
+            RawToken::Equal => TokenType::Equal,
+            RawToken::LessThan => TokenType::LessThan,
+            RawToken::GreaterThan => TokenType::GreaterThan,
+            RawToken::GtEq => TokenType::GtEq,
+            RawToken::LtEq => TokenType::LtEq,
+            RawToken::Or => TokenType::Or,
+            RawToken::DoubleOr => TokenType::DoubleOr,
+            RawToken::DoubleAnd => TokenType::DoubleAnd,
+            RawToken::DoubleEqual => TokenType::DoubleEqual,
+            RawToken::NotEqual => TokenType::NotEqual,
             RawToken::Return => TokenType::Return,
             RawToken::Int => TokenType::Int,
             RawToken::Void => TokenType::Void,
@@ -94,7 +122,9 @@ impl Token {
         use TokenType::*;
         matches!(
             self.get_type(),
-            Plus | Hyphen | Asterisk | ForwardSlash | Percent
+            Plus | Hyphen | Asterisk | ForwardSlash | Percent |
+            LessThan | GreaterThan | GtEq | LtEq | Equal | NotEqual |
+            And | Or | DoubleAnd | DoubleOr | DoubleEqual
         )
     }
 
@@ -106,6 +136,17 @@ impl Token {
             Asterisk => BinaryOp::Mul,
             ForwardSlash => BinaryOp::Div,
             Percent => BinaryOp::Rem,
+            LessThan => BinaryOp::LessThan,
+            GreaterThan => BinaryOp::GreaterThan,
+            GtEq => BinaryOp::GtEq,
+            LtEq => BinaryOp::LtEq,
+            NotEqual => BinaryOp::NotEqual,
+            DoubleAnd => BinaryOp::And,
+            DoubleOr => BinaryOp::Or,
+            DoubleEqual => BinaryOp::Equal,            
+            // And => BinaryOp::BitwiseAnd,
+            // Or => BinaryOp::BitwiseOr,
+            // Equal => BinaryOp::Assign,
             _ => panic!("Internal error: expected a binary operator token, found {:?}", self),
         }
     }
@@ -139,5 +180,11 @@ impl RawToken {
         } else {
             panic!("Internal error: expected an identifier token, found {:?}", self);
         }
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
     }
 }
