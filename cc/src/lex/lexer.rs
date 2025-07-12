@@ -119,7 +119,7 @@ impl Lexer {
         
         let integer_str: String = self.input[start_position..self.position].iter().collect();
         let integer_val = integer_str.parse::<i64>()
-            .map_err(|e| super::Error::new(&format!("Invalid integer: {e:?}")))?;
+            .map_err(|e| Error::Lex(format!("Invalid integer: {e:?}")))?;
         
         let raw = RawToken::Integer(integer_val);
 
@@ -194,7 +194,7 @@ impl Lexer {
             _ => {
                 self.has_error = true;
                 self.advance();
-                return Err(super::Error::new(&format!("Unexpected character: '{}'", cur_char)).into());
+                return Err(Error::Lex(format!("Unexpected character: '{}'", cur_char)));
             }
         };
         let span = span!(start_line, start_column);

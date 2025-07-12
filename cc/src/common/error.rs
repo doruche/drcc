@@ -8,8 +8,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
-    Lex(lex::Error),
-    Parse(parse::Error),
+    Lex(String),
+    Parse(String),
 
     // General errors
     Errors(Vec<Error>),
@@ -31,17 +31,5 @@ impl Display for Error {
             Error::Unimplemented => write!(f, "Feature not implemented"),
             Error::Other(msg) => write!(f, "{}", msg),
         }
-    }
-}
-
-impl From<lex::Error> for Error {
-    fn from(value: lex::Error) -> Self {
-        Error::Lex(value)
-    }
-}
-
-impl From<parse::Error> for Error {
-    fn from(value: parse::Error) -> Self {
-        Error::Parse(value)
     }
 }

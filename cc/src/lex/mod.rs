@@ -6,28 +6,6 @@ use std::fmt::Display;
 
 pub use lexer::Lexer;
 
-// #[derive(Debug)]
-// pub enum Error {
-//     
-// }
-
-#[derive(Debug)]
-pub struct Error {
-    msg: String,
-}
-
-impl Error {
-    pub fn new(msg: &str) -> Self {
-        Error { msg: msg.to_string() }
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.msg)
-    }
-}
-
 
 #[cfg(test)]
 mod tests {
