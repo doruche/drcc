@@ -1,17 +1,15 @@
-use crate::{ast::Parser, common::{BinaryOp, Error, Result, Span, TokenType, UnaryOp}};
+use crate::common::*;
+use super::{
+    Parser,
+    TopLevel,
+    Decl,
+    Expr,
+    Stmt,
+    BlockItem,
+    UnaryOp,
+    BinaryOp,
+};
 
-
-#[derive(Debug, Clone)]
-pub enum Expr {
-    IntegerLiteral(i64),
-    Group(Box<Expr>),
-    Unary((UnaryOp, Span), Box<Expr>),
-    Binary {
-        op: (BinaryOp, Span),
-        left: Box<Expr>,
-        right: Box<Expr>
-    }
-}
 
 impl Parser {
     pub(super) fn expr_top_level(&mut self) -> Result<Expr> {
@@ -31,11 +29,21 @@ impl Parser {
             }
             let next_op_token = self.eat_current();
             let next_op = next_op_token.to_binary_op();
-            right = self.expr(next_op.precedence() + 1)?;
-            left = Expr::Binary {
-                op: (next_op, next_op_token.span),
-                left: Box::new(left),
-                right: Box::new(right),
+
+            if let BinaryOp::Assign = next_op {
+                // right-associative
+                right = self.expr(BinaryOp::Assign.precedence())?;
+                left = Expr::Assignment {
+                    left: Box::new(left),
+                    right: Box::new(right),
+                };
+            } else {
+                right = self.expr(next_op.precedence() + 1)?;
+                left = Expr::Binary {
+                    op: (next_op, next_op_token.span),
+                    left: Box::new(left),
+                    right: Box::new(right),
+                }
             }
         }
         
@@ -67,11 +75,17 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr> {
         let token = self.eat_current();
         match token.get_type() {
-            TokenType::Integer => Ok(Expr::IntegerLiteral(token.inner.as_integer())),
+            TokenType::Integer => Ok(Expr::IntegerLiteral(token.inner.as_integer(), token.span)),
             TokenType::LParen => {
                 let expr = self.parse_expr()?;
                 self.eat(TokenType::RParen, "Expected ')' to close expression.")?;
                 Ok(Expr::Group(Box::new(expr)))
+            },
+            TokenType::Identifier => {
+                // currently only variable
+                let sd = token.inner.as_identifier();
+                let span = token.span;
+                Ok(Expr::Variable(sd, span))
             }
             _ => Err(Error::Parse(format!(
                 "Expected an integer literal, found: {:?}",

@@ -1,5 +1,18 @@
-use crate::{ast::{self, Expr, Stmt}, common::{BinaryOp, Result}, tac::{Function, Insn, Operand, TopLevel}};
+use crate::common::{
+    DataType,
+    Result,
+    Error,
+};
+use crate::ast;
 
+use super::{
+    Operand,
+    Insn,
+    Function,
+    TopLevel,
+    UnaryOp,
+    BinaryOp,
+};
 
 #[derive(Debug)]
 pub struct Parser {
@@ -18,7 +31,7 @@ impl Parser {
 
         for decl in self.ast.decls {
             match decl {
-                ast::TopDeclaration::FuncDecl { 
+                ast::Decl::FuncDecl { 
                     return_type, 
                     name, 
                     body 
@@ -27,7 +40,7 @@ impl Parser {
                     let mut next_temp_id = 0;
                     let mut next_label_id = 0;
                     for stmt in body {
-                        let insns = parse_stmt(stmt, &mut next_temp_id, &mut next_label_id)?;
+                        let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_label_id)?;
                         body_insns.extend(insns);
                     }
                     top_delcs.push(Function {
@@ -42,6 +55,25 @@ impl Parser {
 
         Ok(TopLevel { functions: top_delcs })
     }
+}
+
+pub(super) fn parse_block_item(
+    item: BlockItem,
+    next_temp_id: &mut usize,
+    next_label_id: &mut usize,
+) -> Result<Vec<Insn>> {
+    match item {
+        BlockItem::Declaration(decl) => parse_decl(decl, next_temp_id, next_label_id),
+        BlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_label_id),
+    }
+}
+
+pub(super) fn parse_decl(
+    decl: Decl,
+    next_temp_id: &mut usize,
+    next_label_id: &mut usize,
+) -> Result<Vec<Insn>> {
+    todo!()    
 }
 
 pub(super) fn parse_stmt(
@@ -62,7 +94,14 @@ pub(super) fn parse_stmt(
                     None => vec![insn],
                 };
                 top_insns.extend(insns);
+        },
+        Stmt::Expr(expr) => {
+            let (operand, insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
+            if let Some(insns) = insns {
+                top_insns.extend(insns);
             }
+        },
+        Stmt::Nil => {},
     }
     Ok(top_insns)
 }
@@ -190,7 +229,9 @@ pub(super) fn parse_expr(
                     insns.push(insn);
                     Ok((Operand::Temp(temp_id), Some(insns)))
                 },
+                Assign => todo!()
             }
-        }
+        },
+        _ => todo!()
     }
 }

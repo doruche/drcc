@@ -2,7 +2,8 @@
 
 use std::fmt::Display;
 
-use crate::{common::{span::Span, BinaryOp, StrDescriptor}, span};
+use crate::{common::{span::Span, StrDescriptor}, span};
+use crate::ast::AstBinaryOp;
 
 /// Token without any additional information.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,6 +119,11 @@ impl Token {
         )
     }
 
+    pub fn is_type(&self) -> bool {
+        use TokenType::*;
+        matches!(self.get_type(), Int | Void)
+    }
+ 
     pub fn is_binary_op(&self) -> bool {
         use TokenType::*;
         matches!(
@@ -128,25 +134,26 @@ impl Token {
         )
     }
 
-    pub fn to_binary_op(&self) -> BinaryOp {
+    pub fn to_binary_op(&self) -> AstBinaryOp {
         use TokenType::*;
         match self.get_type() {
-            Plus => BinaryOp::Add,
-            Hyphen => BinaryOp::Sub,
-            Asterisk => BinaryOp::Mul,
-            ForwardSlash => BinaryOp::Div,
-            Percent => BinaryOp::Rem,
-            LessThan => BinaryOp::LessThan,
-            GreaterThan => BinaryOp::GreaterThan,
-            GtEq => BinaryOp::GtEq,
-            LtEq => BinaryOp::LtEq,
-            NotEqual => BinaryOp::NotEqual,
-            DoubleAnd => BinaryOp::And,
-            DoubleOr => BinaryOp::Or,
-            DoubleEqual => BinaryOp::Equal,            
-            // And => BinaryOp::BitwiseAnd,
-            // Or => BinaryOp::BitwiseOr,
-            // Equal => BinaryOp::Assign,
+            Plus => AstBinaryOp::Add,
+            Hyphen => AstBinaryOp::Sub,
+            Asterisk => AstBinaryOp::Mul,
+            ForwardSlash => AstBinaryOp::Div,
+            Percent => AstBinaryOp::Rem,
+            LessThan => AstBinaryOp::LessThan,
+            GreaterThan => AstBinaryOp::GreaterThan,
+            GtEq => AstBinaryOp::GtEq,
+            LtEq => AstBinaryOp::LtEq,
+            NotEqual => AstBinaryOp::NotEqual,
+            DoubleAnd => AstBinaryOp::And,
+            DoubleOr => AstBinaryOp::Or,
+            DoubleEqual => AstBinaryOp::Equal,
+            Equal => AstBinaryOp::Assign,
+            // And => AstBinaryOp::BitwiseAnd,
+            // Or => AstBinaryOp::BitwiseOr,
+            // Equal => AstBinaryOp::Assign,
             _ => panic!("Internal error: expected a binary operator token, found {:?}", self),
         }
     }

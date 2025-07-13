@@ -6,33 +6,31 @@ use std::fmt::Display;
 mod parser;
 mod expr;
 mod stmt;
+mod decl;
+mod ast;
 
-pub use parser::Parser as AstParser;
-pub(super) use parser::Parser;
-pub use expr::Expr;
-pub use stmt::Stmt;
-
+use parser::Parser;
+use ast::{
+    TopLevel,
+    Decl,
+    Expr,
+    Stmt,
+    BlockItem,
+    UnaryOp,
+    BinaryOp,
+};
 use crate::common::{DataType, Span, StrDescriptor};
 
-#[derive(Debug, Clone)]
-pub struct TopLevel {
-    pub decls: Vec<TopDeclaration>,
-}
-
-#[derive(Debug, Clone)]
-pub enum TopDeclaration {
-    FuncDecl {
-        return_type: (DataType, Span),
-        name: (StrDescriptor, Span),
-        // params,
-        body: Vec<Stmt>,
-    },
-    GloblVar {
-        name: (StrDescriptor, Span),
-        data_type: DataType,
-        // initial value,
-    }
-}
+pub use parser::Parser as AstParser;
+pub use ast::{
+    TopLevel as AstTopLevel,
+    Decl as AstDecl,
+    Expr as AstExpr,
+    Stmt as AstStmt,
+    BlockItem as AstBlockItem,
+    UnaryOp as AstUnaryOp,
+    BinaryOp as AstBinaryOp,
+};
 
 #[cfg(test)]
 mod tests {
@@ -47,10 +45,26 @@ mod tests {
         let input = read_to_string("../testprogs/return_2.c").unwrap();
         let mut lexer = Lexer::new(input);
         let (tokens, pool) = lexer.lex().unwrap();
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens, pool);
         match parser.parse_prog() {
             Ok(stmt) => {
                 println!("{:#?}", stmt);
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_expr() {
+        let input = "a = 5 = 7 + 2";
+        let mut lexer = Lexer::new(input.into());
+        let (tokens, pool) = lexer.lex().unwrap();
+        let mut parser = Parser::new(tokens, pool);
+        match parser.parse_expr() {
+            Ok(expr) => {
+                println!("{:#?}", expr);
             }
             Err(e) => {
                 eprintln!("{}", e);
@@ -66,7 +80,7 @@ mod tests {
         // for token in &tokens {
         //     println!("{}", token);
         // }
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens, pool);
         match parser.parse_prog() {
             Ok(stmt) => {
                 println!("{:#?}", stmt);
