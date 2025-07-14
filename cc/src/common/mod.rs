@@ -12,5 +12,6 @@ pub use string_pool::{StringPool, StrDescriptor};
 pub enum DataType {
     Int,
     Void,
+    Indeterminate,
 }
 

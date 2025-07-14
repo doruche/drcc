@@ -8,7 +8,7 @@ pub struct StringPool {
     pool: HashMap<String, usize>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
 pub struct StrDescriptor(usize);
 
 impl StrDescriptor {

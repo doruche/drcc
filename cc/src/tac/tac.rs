@@ -1,4 +1,9 @@
-use crate::common::{DataType, StrDescriptor, StringPool};
+use crate::common::*;
+use crate::sem::{
+    HirBinaryOp,
+    HirUnaryOp,
+};
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
@@ -71,15 +76,41 @@ pub struct Function {
     pub body: Vec<Insn>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TopLevel {
     pub functions: Vec<Function>,
+    // global variables,
+    pub strtb: StringPool,
 }
 
-impl TopLevel {
-    fn dump(&self, strtb: &StringPool) -> String {
-        let insns = format!("{:#}", self);
-        let strtb = strtb.dump();
-        format!("{}\nString Table:\n{}", insns, strtb)
+impl From<HirBinaryOp> for BinaryOp {
+    fn from(op: HirBinaryOp) -> Self {
+        match op {
+            HirBinaryOp::Add => BinaryOp::Add,
+            HirBinaryOp::Sub => BinaryOp::Sub,
+            HirBinaryOp::Mul => BinaryOp::Mul,
+            HirBinaryOp::Div => BinaryOp::Div,
+            HirBinaryOp::Rem => BinaryOp::Rem,
+            HirBinaryOp::Ls => BinaryOp::Ls,
+            HirBinaryOp::Gt => BinaryOp::Gt,
+            HirBinaryOp::GtEq => BinaryOp::GtEq,
+            HirBinaryOp::LsEq => BinaryOp::LsEq,
+            HirBinaryOp::Eq => BinaryOp::Eq,
+            HirBinaryOp::NotEq => BinaryOp::NotEq,
+            HirBinaryOp::And => BinaryOp::And,
+            HirBinaryOp::Or => BinaryOp::Or,
+            HirBinaryOp::Assign => BinaryOp::Assign,
+        }
+    }
+}
+
+impl From<HirUnaryOp> for UnaryOp {
+    fn from(op: HirUnaryOp) -> Self {
+        match op {
+            HirUnaryOp::Pos => UnaryOp::Pos,
+            HirUnaryOp::Negate => UnaryOp::Negate,
+            HirUnaryOp::Complement => UnaryOp::Complement,
+            HirUnaryOp::Not => UnaryOp::Not,
+        }
     }
 }

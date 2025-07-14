@@ -34,6 +34,7 @@ impl Parser {
                 // right-associative
                 right = self.expr(BinaryOp::Assign.precedence())?;
                 left = Expr::Assignment {
+                    span: next_op_token.span,
                     left: Box::new(left),
                     right: Box::new(right),
                 };
@@ -75,7 +76,7 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr> {
         let token = self.eat_current();
         match token.get_type() {
-            TokenType::Integer => Ok(Expr::IntegerLiteral(token.inner.as_integer(), token.span)),
+            TokenType::Integer => Ok(Expr::IntegerLiteral(token.inner.as_integer())),
             TokenType::LParen => {
                 let expr = self.parse_expr()?;
                 self.eat(TokenType::RParen, "Expected ')' to close expression.")?;

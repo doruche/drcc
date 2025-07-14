@@ -8,69 +8,108 @@ use super::{
     BinaryOp,
 };
 
-
-impl Display for Operand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Operand::Imm(value) => write!(f, "{}", value),
-            Operand::Var(name) => write!(f, "[{}]", name.index()),
-            Operand::Temp(id) => write!(f, "t{}", id),
+impl TopLevel {
+    pub fn emit(&self) -> String {
+        let mut output = String::new();
+        for func in &self.functions {
+            output.push_str(&self.emit_func(func));
         }
+        output
     }
-}
 
-impl Display for Insn {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Insn::Return(Some(operand)) => write!(f, "ret {}", operand),
-            Insn::Return(None) => write!(f, "ret"),
-            Insn::Unary { op, src, dst } => match op {
-                UnaryOp::Complement => write!(f, "cpl {}, {}", dst, src),
-                UnaryOp::Negate => write!(f, "neg {}, {}", dst, src),
-                UnaryOp::Pos => write!(f, "pos {}, {}", dst, src),
-                UnaryOp::Not => write!(f, "not {}, {}", dst, src),
+    fn emit_func(&self, func: &Function) -> String {
+        let mut output = String::new();
+        let signature = format!(
+            "fn {} (void) -> int",
+            self.strtb.get(func.name).unwrap(),
+        );
+        output.push_str(&signature);
+        output.push('\n');
+        for insn in &func.body {
+            let prefix = if let Insn::Label(..) = insn {
+                "".to_string()
+            } else {
+                "   ".to_string()
+            };
+            let insn_str = self.emit_insn(insn);
+            output.push_str(&format!("{}{}\n", prefix, insn_str));
+        }
+        output.push_str("\n");
+
+        output
+    }
+
+    fn emit_insn(&self, insn: &Insn) -> String {
+        match insn {
+            Insn::Return(val) => {
+                let val_str = if let Some(operand) = val {
+                    self.emit_operand(operand)
+                } else {
+                    "".to_string()
+                };
+                format!("ret {}", val_str)
             },
-            Insn::Binary { op, left, right, dst } => match op {
-                BinaryOp::Add => write!(f, "add {}, {}, {}", dst, left, right),
-                BinaryOp::Sub => write!(f, "sub {}, {}, {}", dst, left, right),
-                BinaryOp::Mul => write!(f, "mul {}, {}, {}", dst, left, right),
-                BinaryOp::Div => write!(f, "div {}, {}, {}", dst, left, right),
-                BinaryOp::Rem => write!(f, "rem {}, {}, {}", dst, left, right),
-                BinaryOp::Ls => write!(f, "lt {}, {}, {}", dst, left, right),
-                BinaryOp::Gt => write!(f, "gt {}, {}, {}", dst, left, right),
-                BinaryOp::GtEq => write!(f, "gte {}, {}, {}", dst, left, right),
-                BinaryOp::LsEq => write!(f, "lte {}, {}, {}", dst, left, right),
-                BinaryOp::Eq => write!(f, "eq {}, {}, {}", dst, left, right),
-                BinaryOp::NotEq => write!(f, "ne {}, {}, {}", dst, left, right),
-                BinaryOp::And|BinaryOp::Or => unreachable!("Combined by other insns"),
-                BinaryOp::Assign => todo!(),
+            Insn::Unary {
+                op,
+                src,
+                dst,
+            } => {
+                match op {
+                    UnaryOp::Pos => "".to_string(),
+                    UnaryOp::Negate =>
+                        format!("neg {}, {}", self.emit_operand(dst), self.emit_operand(src)),
+                    UnaryOp::Not =>
+                        format!("not {}, {}", self.emit_operand(dst), self.emit_operand(src)),
+                    UnaryOp::Complement =>
+                        format!("cmpl {}, {}", self.emit_operand(dst), self.emit_operand(src)),
+                }
             },
-            Insn::Label(name) => write!(f, "\rL.{}:", name),
-            Insn::Jump(label) => write!(f, "jmp L.{}", label),
-            Insn::BranchIfZero { src, label } => write!(f, "biz {}, L.{}", src, label),
-            Insn::BranchNotZero { src, label } => write!(f, "bnz {}, L.{}", src, label),
-            Insn::Move { src, dst } => write!(f, "mov {}, {}", dst, src),
+            Insn::Binary {
+                op,
+                left,
+                right,
+                dst,
+            } => {
+                let left_str = self.emit_operand(left);
+                let right_str = self.emit_operand(right);
+                let dst_str = self.emit_operand(dst);
+                match op {
+                    BinaryOp::Add => format!("add {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Sub => format!("sub {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Mul => format!("mul {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Div => format!("div {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Rem => format!("rem {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Ls => format!("ls {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Gt => format!("gt {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::GtEq => format!("gte {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::LsEq => format!("lte {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Eq => format!("eq {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::NotEq => format!("neq {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::And => format!("and {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Or => format!("or {}, {}, {}", dst_str, left_str, right_str),
+                    BinaryOp::Assign => unreachable!(),
+                }
+            },
+            Insn::BranchIfZero { src, label }
+                => format!("bz {}, L.{}", self.emit_operand(src), label),
+            Insn::BranchNotZero { src, label }
+                => format!("bnz {}, L.{}", self.emit_operand(src), label),
+            Insn::Label(lid) => format!("L.{}", lid),
+            Insn::Jump(lid) => format!("jmp L.{}", lid),
+            Insn::Move { src, dst} => 
+                format!("mov {}, {}", self.emit_operand(dst), self.emit_operand(src)),
         }
     }
-}
 
-impl Display for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "fn [{}]: {:?} {{\n", self.name.index(), self.return_type)?;
-        for insn in &self.body {
-            write!(f, "    {}\n", insn)?;
+    fn emit_operand(&self, operand: &Operand) -> String {
+        match operand {
+            Operand::Imm(imm) => imm.to_string(),
+            Operand::Temp(tid) => format!("t.{}", tid),
+            Operand::Var(sd) => {
+                let name = self.strtb.get(*sd).unwrap();
+                format!("{}", name)
+            },
         }
-        write!(f, "}}\n")?;
-        Ok(())
-    }
-}
-
-impl Display for TopLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for function in &self.functions {
-            write!(f, "{}", function)?;
-        }
-        Ok(())
     }
 }
 

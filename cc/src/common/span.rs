@@ -1,6 +1,6 @@
 //! Location information used when errors are reported in lexing, parsing and resolving stages.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
     pub line: usize,
     pub column: usize,
@@ -16,5 +16,12 @@ impl Span {
         let mut span = self;
         span.length = Some(length);
         span
+    }
+
+    pub fn end_col(&self) -> usize {
+        match self.length {
+            Some(len) => self.column + len,
+            None => self.column,
+        }
     }
 }

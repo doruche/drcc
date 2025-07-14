@@ -1,9 +1,14 @@
-use crate::common::{
-    DataType,
-    Result,
-    Error,
+use crate::common::*;
+use crate::sem::{
+    HirTopLevel,
+    HirDecl,
+    HirBlockItem,
+    HirStmt,
+    HirTypedExpr,
+    HirExpr,
+    HirUnaryOp,
+    HirBinaryOp,
 };
-use crate::ast;
 
 use super::{
     Operand,
@@ -16,22 +21,23 @@ use super::{
 
 #[derive(Debug)]
 pub struct Parser {
-    ast: ast::TopLevel,
+    hir: HirTopLevel, 
 }
 
 impl Parser {
-    pub fn new(ast: ast::TopLevel) -> Self {
+    pub fn new(hir: HirTopLevel) -> Self {
         Self {
-            ast,
+            hir,
         }
     }
 
     pub fn parse(mut self) -> Result<TopLevel> {
-        let mut top_delcs = vec![];
+        let mut decls = vec![];
+        let strtb = self.hir.strtb;
 
-        for decl in self.ast.decls {
+        for decl in self.hir.decls {
             match decl {
-                ast::Decl::FuncDecl { 
+                HirDecl::FuncDecl { 
                     return_type, 
                     name, 
                     body 
@@ -43,7 +49,7 @@ impl Parser {
                         let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_label_id)?;
                         body_insns.extend(insns);
                     }
-                    top_delcs.push(Function {
+                    decls.push(Function {
                         name: name.0,
                         return_type: return_type.0,
                         body: body_insns,
@@ -53,23 +59,23 @@ impl Parser {
             }
         }
 
-        Ok(TopLevel { functions: top_delcs })
+        Ok(TopLevel { functions: decls, strtb })
     }
 }
 
 pub(super) fn parse_block_item(
-    item: BlockItem,
+    item: HirBlockItem,
     next_temp_id: &mut usize,
     next_label_id: &mut usize,
 ) -> Result<Vec<Insn>> {
     match item {
-        BlockItem::Declaration(decl) => parse_decl(decl, next_temp_id, next_label_id),
-        BlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_label_id),
+        HirBlockItem::Declaration(decl) => parse_decl(decl, next_temp_id, next_label_id),
+        HirBlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_label_id),
     }
 }
 
 pub(super) fn parse_decl(
-    decl: Decl,
+    decl: HirDecl,
     next_temp_id: &mut usize,
     next_label_id: &mut usize,
 ) -> Result<Vec<Insn>> {
@@ -77,13 +83,13 @@ pub(super) fn parse_decl(
 }
 
 pub(super) fn parse_stmt(
-    stmt: Stmt, 
+    stmt: HirStmt, 
     next_temp_id: &mut usize,
     next_label_id: &mut usize
 ) -> Result<Vec<Insn>> {
     let mut top_insns = vec![];
     match stmt {
-        Stmt::Return { span, expr } => {
+        HirStmt::Return { span, expr } => {
             let (operand, insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
                 let insn = Insn::Return(Some(operand));
                 let insns = match insns {
@@ -95,33 +101,35 @@ pub(super) fn parse_stmt(
                 };
                 top_insns.extend(insns);
         },
-        Stmt::Expr(expr) => {
+        HirStmt::Expr(expr) => {
             let (operand, insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
             if let Some(insns) = insns {
                 top_insns.extend(insns);
             }
         },
-        Stmt::Nil => {},
+        HirStmt::Nil => {},
     }
     Ok(top_insns)
 }
 
 /// Returns the destination operand and any generated instructions.
 pub(super) fn parse_expr(
-    expr: Expr, 
+    expr: HirTypedExpr, 
     next_temp_id: &mut usize,
     next_label_id: &mut usize,
 ) -> Result<(Operand, Option<Vec<Insn>>)> {
+    let type_ = expr.type_;
+    let expr = expr.expr;
     match expr {
-        Expr::IntegerLiteral(val) => {
+        HirExpr::IntegerLiteral(val) => {
             Ok((Operand::Imm(val), None))
         },
-        Expr::Unary((op, span), expr) => {
+        HirExpr::Unary((op, span), expr) => {
             let (src, mut insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
             let temp_id = *next_temp_id;
             *next_temp_id += 1;
             let insn = Insn::Unary {
-                op,
+                op: op.into(),
                 src,
                 dst: Operand::Temp(temp_id),
             };
@@ -134,10 +142,11 @@ pub(super) fn parse_expr(
             };
             Ok((Operand::Temp(temp_id), insns))
         }
-        Expr::Group(inner) => {
+        HirExpr::Group(inner) => {
             parse_expr(*inner, next_temp_id, next_label_id)
         }
-        Expr::Binary { op: (op, span), left, right } => {
+        HirExpr::Binary { op: (op, span), left, right } => {
+            let op = op.into();
             use BinaryOp::*;
             match op {
                 And|Or => {
@@ -207,8 +216,7 @@ pub(super) fn parse_expr(
                     Ok((result_operand, Some(top_insns)))
                 },
                 Add|Sub|Mul|Div|Rem|
-                LessThan|GreaterThan|
-                GtEq|LtEq|Equal|NotEqual => {
+                Ls|Gt|GtEq|LsEq|Eq|NotEq => {
                     let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
                     let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
                     let temp_id = *next_temp_id;
@@ -232,6 +240,11 @@ pub(super) fn parse_expr(
                 Assign => todo!()
             }
         },
-        _ => todo!()
+        HirExpr::Variable(name, span) => {
+            todo!();
+        },
+        HirExpr::Assignment { span, left, right } => {
+            todo!();
+        }
     }
 }

@@ -1,16 +1,11 @@
 //! HIR representation
 
 use crate::common::*;
-use super::{
-    SymbolId,
-    SymbolTable,
-};
 
 #[derive(Debug)]
 pub struct TopLevel {
     pub decls: Vec<Decl>,
     pub strtb: StringPool,
-    pub symtb: SymbolTable,
 }
 
 #[derive(Debug)]
@@ -22,46 +17,59 @@ pub enum BlockItem {
 #[derive(Debug)]
 pub enum Decl {
     FuncDecl {
-        id: SymbolId,       
         return_type: (DataType, Span),
         name: (StrDescriptor, Span),
         // params,
         body: Vec<BlockItem>,
     },
     VarDecl {
-        id: SymbolId,
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
-        initializer: Option<Box<Expr>>,
+        initializer: Option<Box<TypedExpr>>,
         // initial value,
     }
 }
 
 #[derive(Debug)]
+pub struct TypedExpr {
+    pub expr: Expr,
+    pub type_: DataType,
+}
+
+impl TypedExpr {
+    pub fn untyped(expr: Expr) -> Self {
+        Self {
+            expr,
+            type_: DataType::Indeterminate,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Expr {
-    IntegerLiteral(i64, Span),
-    Variable(SymbolId, StrDescriptor, Span),
+    IntegerLiteral(i64),
+    Variable(StrDescriptor, Span),
     Assignment {
-        left: Box<Expr>,
-        right: Box<Expr>,
+        span: Span,
+        left: Box<TypedExpr>,
+        right: Box<TypedExpr>,
     },
-    Group(Box<Expr>),
-    Unary((UnaryOp, Span), Box<Expr>),
+    Group(Box<TypedExpr>),
+    Unary((UnaryOp, Span), Box<TypedExpr>),
     Binary {
         op: (BinaryOp, Span),
-        left: Box<Expr>,
-        right: Box<Expr>,
+        left: Box<TypedExpr>,
+        right: Box<TypedExpr>,
     },
-    Nil,
 }
 
 #[derive(Debug)]
 pub enum Stmt {
     Return {
         span: Span,
-        expr: Box<Expr>,
+        expr: Box<TypedExpr>,
     },
-    Expr(Box<Expr>),
+    Expr(Box<TypedExpr>),
     Nil,
 }
 
@@ -80,13 +88,47 @@ pub enum BinaryOp {
     Mul,
     Div,
     Rem,
-    LessThan,
-    GreaterThan,
+    Ls,
+    Gt,
     GtEq,
-    LtEq,
-    Equal,
-    NotEqual,
+    LsEq,
+    Eq,
+    NotEq,
     And,
     Or,
     Assign,
+}
+
+use crate::ast::{AstUnaryOp, AstBinaryOp};
+
+impl From<AstUnaryOp> for UnaryOp {
+    fn from(op: AstUnaryOp) -> Self {
+        match op {
+            AstUnaryOp::Pos => UnaryOp::Pos,
+            AstUnaryOp::Negate => UnaryOp::Negate,
+            AstUnaryOp::Not => UnaryOp::Not,
+            AstUnaryOp::Complement => UnaryOp::Complement,
+        }
+    }
+}
+
+impl From<AstBinaryOp> for BinaryOp {
+    fn from(op: AstBinaryOp) -> Self {
+        match op {
+            AstBinaryOp::Add => BinaryOp::Add,
+            AstBinaryOp::Sub => BinaryOp::Sub,
+            AstBinaryOp::Mul => BinaryOp::Mul,
+            AstBinaryOp::Div => BinaryOp::Div,
+            AstBinaryOp::Rem => BinaryOp::Rem,
+            AstBinaryOp::LessThan => BinaryOp::Ls,
+            AstBinaryOp::GreaterThan => BinaryOp::Gt,
+            AstBinaryOp::GtEq => BinaryOp::GtEq,
+            AstBinaryOp::LtEq => BinaryOp::LsEq,
+            AstBinaryOp::Equal => BinaryOp::Eq,
+            AstBinaryOp::NotEqual => BinaryOp::NotEq,
+            AstBinaryOp::And => BinaryOp::And,
+            AstBinaryOp::Or => BinaryOp::Or,
+            AstBinaryOp::Assign => BinaryOp::Assign,
+        }
+    }
 }

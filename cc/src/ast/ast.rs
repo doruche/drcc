@@ -36,9 +36,10 @@ pub enum BlockItem {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    IntegerLiteral(i64, Span),
+    IntegerLiteral(i64),
     Variable(StrDescriptor, Span),
     Assignment {
+        span: Span,
         left: Box<Expr>,
         right: Box<Expr>,
     },

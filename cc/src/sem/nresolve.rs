@@ -1,0 +1,163 @@
+//! The first pass of semantic analysis.
+//! Resolves names, fill in the symbol table, and builds an incomplete HirTopLevel.
+
+use crate::common::{
+    StrDescriptor,
+    Span,
+    Error
+};
+use super::{
+    Parser,
+    SymbolTable,
+    SymError,
+    VarSymbol,
+    FuncSymbol,
+    TopLevel,
+    Decl,
+    BlockItem,
+    Stmt,
+    TypedExpr,
+    Expr,
+    UnaryOp,
+    BinaryOp,
+};
+use crate::ast::{
+    AstTopLevel,
+    AstDecl,
+    AstBlockItem,
+    AstStmt,
+    AstExpr,
+    AstUnaryOp,
+    AstBinaryOp,
+};
+
+impl Parser {
+    pub(super) fn nresolve_decl(
+        &mut self,
+        decl: AstDecl,
+    ) -> Result<Decl, (SymError, Span)> {
+        match decl {
+            AstDecl::FuncDecl {
+                return_type,
+                name,
+                body,
+            } => {
+                self.symtb.def_func(
+                    name.0,
+                    return_type.0,
+                ).map_err(|e| (e, name.1))?;
+                self.symtb.enter_scope();
+                let mut r_body = vec![];
+                for item in body {
+                    r_body.push(self.nresolve_block_item(item)?);
+                }
+                self.symtb.exit_scope();
+                Ok(Decl::FuncDecl {
+                    return_type,
+                    name,
+                    body: r_body,
+                })
+            },
+            AstDecl::VarDecl { 
+                name, 
+                data_type, 
+                initializer 
+            } => {
+                self.symtb.def_var(name.0, data_type.0)
+                    .map_err(|e| (e, name.1))?;
+                let r_initializer = initializer
+                    .map(|expr| self.nresolve_expr(*expr))
+                    .transpose()?
+                    .map(Box::new);
+
+                Ok(Decl::VarDecl {
+                    name,
+                    data_type,
+                    initializer: r_initializer,
+                })
+            }
+        }
+    }
+
+    pub(super) fn nresolve_block_item(
+        &mut self,
+        item: AstBlockItem,
+    ) -> Result<BlockItem, (SymError, Span)> {
+        match item {
+            AstBlockItem::Declaration(decl) => self
+                .nresolve_decl(decl)
+                .map(BlockItem::Declaration),
+            AstBlockItem::Statement(stmt) => self
+                .nresolve_stmt(stmt)
+                .map(BlockItem::Statement),
+        }
+    }
+    
+    pub(super) fn nresolve_stmt(
+        &mut self,
+        stmt: AstStmt,
+    ) -> Result<Stmt, (SymError, Span)> {
+        match stmt {
+            AstStmt::Nil => Ok(Stmt::Nil),
+            AstStmt::Expr(expr) => {
+                let expr = self.nresolve_expr(*expr)?;
+                Ok(Stmt::Expr(Box::new(expr)))
+            },
+            AstStmt::Return { span, expr } => {
+                let expr = self.nresolve_expr(*expr)?;
+                Ok(Stmt::Return {
+                    span,
+                    expr: Box::new(expr),
+                })
+            }
+        }
+    }
+
+    pub(super) fn nresolve_expr(
+        &mut self,
+        expr: AstExpr,
+    ) -> Result<TypedExpr, (SymError, Span)> {
+        let inner = match expr {
+            AstExpr::IntegerLiteral(value) => Ok(Expr::IntegerLiteral(value)),
+            AstExpr::Variable(name, span) => {
+                let _symbol = self.symtb.lookup_var(name)
+                    .map_err(|sym_e| (sym_e, span))?;
+                Ok(Expr::Variable(name, span))
+            },
+            AstExpr::Unary((op, span), expr) => {
+                let expr = self.nresolve_expr(*expr)?;
+                Ok(Expr::Unary((op.into(), span), Box::new(expr)))
+            },
+            AstExpr::Binary { op: (op, span), left, right } => {
+                let left = self.nresolve_expr(*left)?;
+                let right = self.nresolve_expr(*right)?;
+                Ok(Expr::Binary {
+                    op: (op.into(), span),
+                    left: Box::new(left),
+                    right: Box::new(right),
+                })
+            },
+            AstExpr::Group(expr) => {
+                let expr = self.nresolve_expr(*expr)?;
+                Ok(Expr::Group(Box::new(expr)))
+            },
+            AstExpr::Assignment { span, left, right } => {
+                // currently, only variable assignment is supported.
+                let left = *left;
+                if let AstExpr::Variable(name, span) = left {
+                    let _symbol = self.symtb.lookup_var(name)
+                        .map_err(|sym_e| (sym_e, span))?;
+                    let right = self.nresolve_expr(*right)?;
+                    Ok(Expr::Assignment {
+                        span,
+                        left: Box::new(TypedExpr::untyped(Expr::Variable(name, span))),
+                        right: Box::new(right),
+                    })
+                } else {
+                    Err((SymError::InvalidLValue, span))
+                }
+            }
+        };
+        Ok(TypedExpr::untyped(inner?))
+    }
+}
