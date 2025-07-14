@@ -47,20 +47,17 @@ impl Parser {
                 Ok(decl) => decls.push(decl),
                 Err((sym_e, span)) => match sym_e {
                     SymError::DuplicateDecl(sd) =>
-                        return Err(Error::Semantic(format!(
-                            "Ln {} Col{}:{}\tSymbol '{}' is already defined in this scope.",
-                            span.line, span.column, span.end_col(), strtb.get(sd).unwrap(),
-                    ))),
+                        return Err(Error::semantic(format!(
+                            "Symbol '{}' is already defined in this scope.",
+                            strtb.get(sd).unwrap()
+                        ), span)),
                     SymError::NotFound(sd) =>
-                        return Err(Error::Semantic(format!(
-                            "Ln {} Col{}:{}\tSymbol '{}' not found.",
-                            span.line, span.column, span.end_col(), strtb.get(sd).unwrap(),
-                    ))),
+                        return Err(Error::semantic(format!("Symbol '{}' is not defined.",
+                        strtb.get(sd).unwrap()), span)),
                     SymError::InvalidLValue =>
-                        return Err(Error::Semantic(format!(
-                            "Ln {} Col{}:{}\tLeft-hand side of assignment must be a variable.",
-                            span.line, span.column, span.end_col(),
-                    ))),
+                        return Err(Error::semantic(format!(
+                            "Left-hand side of assignment must be a variable.",
+                        ), span)),
                 }
             }
         }

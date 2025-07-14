@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use crate::{lex, ast};
+use crate::{ast, common::Span, lex};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -15,6 +15,20 @@ pub enum Error {
     Errors(Vec<Error>),
     Unimplemented,
     Other(String),
+}
+
+impl Error {
+    pub fn lex(msg: impl Into<String>, span: Span) -> Self {
+        Error::Lex(format!("Ln {} Col {}:{}\t{}", span.line, span.column, span.end_col(), msg.into()))
+    }
+
+    pub fn parse(msg: impl Into<String>, span: Span) -> Self {
+        Error::Parse(format!("Ln {} Col {}:{}\t{}", span.line, span.column, span.end_col(), msg.into()))
+    }
+
+    pub fn semantic(msg: impl Into<String>, span: Span) -> Self {
+        Error::Semantic(format!("Ln {} Col {}:{}\t{}", span.line, span.column, span.end_col(), msg.into()))
+    }
 }
 
 impl Display for Error {

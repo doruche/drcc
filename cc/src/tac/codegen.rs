@@ -35,6 +35,7 @@ impl Parser {
         let mut decls = vec![];
         let strtb = self.hir.strtb;
 
+        // global declarations
         for decl in self.hir.decls {
             match decl {
                 HirDecl::FuncDecl { 
@@ -49,13 +50,20 @@ impl Parser {
                         let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_label_id)?;
                         body_insns.extend(insns);
                     }
+                    // C standard specifies that a function without a return statement will
+                    // return 0 if it is the main function, otherwise:
+                    // 1. undefined behavior, if the value is used by the caller
+                    // 2. works fine, if the value is not used by the caller
+                    // here, we insert a 'ret 0' instruction to make sure the standard is followed
+                    body_insns.push(Insn::Return(Some(Operand::Imm(0))));
+
                     decls.push(Function {
                         name: name.0,
                         return_type: return_type.0,
                         body: body_insns,
                     });
                 },
-                _ => unimplemented!(),
+                HirDecl::VarDecl{..} => unimplemented!(),
             }
         }
 
@@ -69,17 +77,31 @@ pub(super) fn parse_block_item(
     next_label_id: &mut usize,
 ) -> Result<Vec<Insn>> {
     match item {
-        HirBlockItem::Declaration(decl) => parse_decl(decl, next_temp_id, next_label_id),
+        HirBlockItem::Declaration(decl) => {
+            // this must be a variable declaration
+            if let HirDecl::VarDecl {
+                name, data_type, initializer,
+            } = decl {
+                // currentlt a pseudo implementation
+                let var = Operand::Var(name.0);
+                let mut insns = vec![];
+                if let Some(expr) = initializer {
+                    let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
+                    if let Some(expr_insns) = expr_insns {
+                        insns.extend(expr_insns);
+                    }
+                    insns.push(Insn::Move {
+                        src: src_operand,
+                        dst: var,
+                    });
+                }
+                Ok(insns)
+            } else {
+                unreachable!();
+            }
+        },
         HirBlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_label_id),
     }
-}
-
-pub(super) fn parse_decl(
-    decl: HirDecl,
-    next_temp_id: &mut usize,
-    next_label_id: &mut usize,
-) -> Result<Vec<Insn>> {
-    todo!()    
 }
 
 pub(super) fn parse_stmt(
@@ -237,14 +259,33 @@ pub(super) fn parse_expr(
                     insns.push(insn);
                     Ok((Operand::Temp(temp_id), Some(insns)))
                 },
-                Assign => todo!()
+                Assign => unreachable!(),
             }
         },
         HirExpr::Variable(name, span) => {
-            todo!();
+            Ok((
+                Operand::Var(name),
+                None,
+            ))
         },
         HirExpr::Assignment { span, left, right } => {
-            todo!();
+            let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
+            let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
+            
+            let insn = Insn::Move {
+                src: right_operand,
+                dst: left_operand,
+            };
+            let mut insns = vec![];
+
+            if let Some(right_insns) = right_insns {
+                insns.extend(right_insns);
+            }
+            if let Some(left_insns) = left_insns {
+                insns.extend(left_insns);
+            }
+            insns.push(insn);
+            Ok((left_operand, Some(insns)))
         }
     }
 }

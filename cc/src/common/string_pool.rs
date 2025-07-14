@@ -29,11 +29,13 @@ impl StringPool {
     }
 
     pub fn intern(&mut self, string: String) -> StrDescriptor {
-        let index = self.pool.len();
-        if !self.pool.contains_key(&string) {
+        if let Some(&index) = self.pool.get(&string) {
+            StrDescriptor(index)
+        } else {
+            let index = self.pool.len();
             self.pool.insert(string, index);
+            StrDescriptor(index)
         }
-        StrDescriptor(index)
     }
 
     pub fn get(&self, descriptor: StrDescriptor) -> Option<&String> {

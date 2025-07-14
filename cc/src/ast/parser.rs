@@ -104,6 +104,7 @@ impl Parser {
             }
             if let Some(next_token) = self.peek() {
                 if next_token.is_synchronizer() {
+                    self.eat_current();
                     return;
                 }
             } else {

@@ -10,6 +10,8 @@ impl Parser {
         if !type_token.is_type() {
             return Err(Error::Parse(format!("Expected a type token, found {:?}", type_token)));
         }
+        assert!(matches!(type_token.get_type(), TokenType::Int));
+
         let id_token = self.eat(TokenType::Identifier, "Expected an identifier")?;
         if self.is_at_end() {
             return Err(Error::Parse("Unexpected end of input while parsing declaration.".into()));
@@ -38,7 +40,27 @@ impl Parser {
             },
             _ => {
                 // variable
-                todo!()
+                match self.peek().unwrap().get_type() {
+                    TokenType::Semicolon => {
+                        self.eat_current();
+                        Ok(Decl::VarDecl {
+                            name: (id_token.inner.as_identifier(), id_token.span),
+                            data_type: (DataType::Int, type_token.span),
+                            initializer: None,
+                        })
+                    },
+                    TokenType::Equal => {
+                        self.eat_current();
+                        let initializer = self.expr_top_level()?;
+                        self.eat(TokenType::Semicolon, "Expected ';' after variable declaration.")?;
+                        Ok(Decl::VarDecl {
+                            name: (id_token.inner.as_identifier(), id_token.span),
+                            data_type: (DataType::Int, type_token.span),
+                            initializer: Some(Box::new(initializer)),
+                        })
+                    },
+                    _ => Err(Error::parse("Expected ';' after variable declaration.", id_token.span)),
+                }
             }
         }
     }

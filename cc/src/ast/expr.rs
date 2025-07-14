@@ -88,10 +88,7 @@ impl Parser {
                 let span = token.span;
                 Ok(Expr::Variable(sd, span))
             }
-            _ => Err(Error::Parse(format!(
-                "Expected an integer literal, found: {:?}",
-                token.get_type()
-            ))),
+            _ => Err(Error::parse("Expected an expression", token.span)),
         }
     }
 }

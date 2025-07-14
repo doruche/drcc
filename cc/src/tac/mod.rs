@@ -66,10 +66,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_prog() {
-        // let input = "int main(void) { return 1 * 2 - 3 * (4 + 5); }";
-        let input = read_to_string("../testprogs/basic.c").unwrap();
+    fn test_inner(path: &str) {
+        let input = read_to_string(path).unwrap();
         let mut lexer = Lexer::new(input.into());
         let (tokens, strtb) = lexer.lex().unwrap();
 
@@ -89,5 +87,15 @@ mod tests {
                 eprintln!("Error: {}", e);
             }
         }
+    }
+
+    #[test]
+    fn test_basic() {
+        test_inner("../testprogs/basic.c");
+    }
+
+    #[test]
+    fn test_var() {
+        test_inner("../testprogs/var.c");
     }
 }

@@ -37,3 +37,35 @@ pub use hir::{
     BinaryOp as HirBinaryOp,
 };
 pub use parse::Parser as HirParser;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_inner(path: &str) {
+        let input = std::fs::read_to_string(path).unwrap();
+        let mut lexer = crate::lex::Lexer::new(input.into());
+        let (tokens, strtb) = lexer.lex().unwrap();
+        
+        let mut parser = crate::ast::AstParser::new(tokens, strtb);
+        let ast = parser.parse_prog().unwrap();
+
+        let mut sem_parser = Parser::new();
+        let result = sem_parser.parse(ast);
+
+        match result {
+            Ok(hir) => println!("{:#?}", hir),
+            Err(e) => println!("{}", e),
+        }        
+    }
+
+    #[test]
+    fn test_basic() {
+        test_inner("../testprogs/return_42.c");
+    }
+
+    #[test]
+    fn test_var() {
+        test_inner("../testprogs/var.c");
+    }
+}

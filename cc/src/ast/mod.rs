@@ -41,22 +41,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_basic() {
-        let input = read_to_string("../testprogs/return_2.c").unwrap();
-        let mut lexer = Lexer::new(input);
-        let (tokens, pool) = lexer.lex().unwrap();
-        let mut parser = Parser::new(tokens, pool);
-        match parser.parse_prog() {
-            Ok(stmt) => {
-                println!("{:#?}", stmt);
-            }
-            Err(e) => {
-                eprintln!("{}", e);
-            }
-        }
-    }
-
-    #[test]
     fn test_expr() {
         let input = "a = 5 = 7 + 2";
         let mut lexer = Lexer::new(input.into());
@@ -72,22 +56,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_binary() {
-        let input = "int main(void) { return 1 <= 3 + 4 * 2 && 3 > 1; }";
+    fn test_inner(path: &str) {
+        let input = read_to_string(path).unwrap();
         let mut lexer = Lexer::new(input.into());
-        let (tokens, pool) = lexer.lex().unwrap();
-        // for token in &tokens {
-        //     println!("{}", token);
-        // }
-        let mut parser = Parser::new(tokens, pool);
+        let (tokens, strtb) = lexer.lex().unwrap();
+
+        let mut parser = Parser::new(tokens, strtb);
         match parser.parse_prog() {
-            Ok(stmt) => {
-                println!("{:#?}", stmt);
+            Ok(prog) => {
+                println!("{:#?}", prog);
             }
             Err(e) => {
                 eprintln!("{}", e);
             }
         }
+
     }
+
+    #[test]
+    fn test_basic() {
+        test_inner("../testprogs/basic.c");
+    }
+
+    #[test]
+    fn test_var() {
+        test_inner("../testprogs/var.c");
+    }
+
 }

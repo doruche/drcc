@@ -20,7 +20,7 @@ impl Span {
 
     pub fn end_col(&self) -> usize {
         match self.length {
-            Some(len) => self.column + len,
+            Some(len) => self.column + len - 1,
             None => self.column,
         }
     }
