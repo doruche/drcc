@@ -17,7 +17,8 @@ pub enum RawToken {
     Semicolon, Bang, And, Equal,
     LessThan, GreaterThan, NotEqual,
     GtEq, LtEq, Or, DoubleOr, DoubleAnd, DoubleEqual,
-    Return, Int, Void,
+    Return, If, Else, QuestionMark, Colon,
+    Int, Void, 
 
 
     // [0-9]+
@@ -56,6 +57,10 @@ pub enum TokenType {
     LtEq,
     NotEqual,
     Return,
+    If,
+    Else,
+    QuestionMark,
+    Colon,
     Int,
     Void,
     Integer,
@@ -103,6 +108,10 @@ impl Token {
             RawToken::DoubleEqual => TokenType::DoubleEqual,
             RawToken::NotEqual => TokenType::NotEqual,
             RawToken::Return => TokenType::Return,
+            RawToken::If => TokenType::If,
+            RawToken::Else => TokenType::Else,
+            RawToken::QuestionMark => TokenType::QuestionMark,
+            RawToken::Colon => TokenType::Colon,
             RawToken::Int => TokenType::Int,
             RawToken::Void => TokenType::Void,
             RawToken::Integer(_) => TokenType::Integer,

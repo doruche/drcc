@@ -100,12 +100,11 @@ impl Parser {
         while !self.is_at_end() {
             token = self.eat_current();
             if token.get_type() == Semicolon {
-                return;
+                break;
             }
             if let Some(next_token) = self.peek() {
                 if next_token.is_synchronizer() {
-                    self.eat_current();
-                    return;
+                    break;
                 }
             } else {
                 break;

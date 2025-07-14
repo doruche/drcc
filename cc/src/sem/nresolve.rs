@@ -109,7 +109,19 @@ impl Parser {
                     span,
                     expr: Box::new(expr),
                 })
-            }
+            },
+            AstStmt::If { condition, then_branch, else_branch} => {
+                let condition = self.nresolve_expr(*condition)?;
+                let then_branch = self.nresolve_stmt(*then_branch)?;
+                let else_branch = else_branch
+                    .map(|stmt| self.nresolve_stmt(*stmt))
+                    .transpose()?;
+                Ok(Stmt::If {
+                    condition: Box::new(condition),
+                    then_branch: Box::new(then_branch),
+                    else_branch: else_branch.map(Box::new),
+                })
+            },
         }
     }
 

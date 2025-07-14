@@ -98,4 +98,9 @@ mod tests {
     fn test_var() {
         test_inner("../testprogs/var.c");
     }
+
+    #[test]
+    fn test_if() {
+        test_inner("../testprogs/if.c");
+    }
 }

@@ -139,6 +139,8 @@ impl Lexer {
             "return" => Ok(Token::new(RawToken::Return, span)),
             "int" => Ok(Token::new(RawToken::Int, span)),
             "void" => Ok(Token::new(RawToken::Void, span)),
+            "if" => Ok(Token::new(RawToken::If, span)),
+            "else" => Ok(Token::new(RawToken::Else, span)),
             _ => {
                 let sd = self.pool.intern(identifier_str.clone());
                 Ok(Token::new(RawToken::Identifier(sd), span))

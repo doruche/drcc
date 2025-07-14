@@ -70,6 +70,11 @@ pub enum Stmt {
         expr: Box<TypedExpr>,
     },
     Expr(Box<TypedExpr>),
+    If {
+        condition: Box<TypedExpr>,
+        then_branch: Box<Stmt>,
+        else_branch: Option<Box<Stmt>>,
+    },
     Nil,
 }
 

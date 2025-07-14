@@ -129,6 +129,41 @@ pub(super) fn parse_stmt(
                 top_insns.extend(insns);
             }
         },
+        HirStmt::If { condition, then_branch, else_branch } => {
+            let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_label_id)?;
+            if let Some(cond_insns) = cond_insns {
+                top_insns.extend(cond_insns);
+            }
+            match else_branch {
+                Some(else_branch) => {
+                    let else_label = *next_label_id;
+                    let end_lable = else_label + 1;
+                    *next_label_id += 2;
+                    top_insns.push(Insn::BranchIfZero {
+                        src: cond_operand,
+                        label: else_label,
+                    });
+                    let then_insns = parse_stmt(*then_branch, next_temp_id, next_label_id)?;
+                    top_insns.extend(then_insns);
+                    top_insns.push(Insn::Jump(end_lable));
+                    top_insns.push(Insn::Label(else_label));
+                    let else_insns = parse_stmt(*else_branch, next_temp_id, next_label_id)?;
+                    top_insns.extend(else_insns);
+                    top_insns.push(Insn::Label(end_lable));
+                },
+                None => {
+                    let end_lable = *next_label_id;
+                    *next_label_id += 1;
+                    top_insns.push(Insn::BranchIfZero {
+                        src: cond_operand,
+                        label: end_lable,
+                    });
+                    let then_insns = parse_stmt(*then_branch, next_temp_id, next_label_id)?;
+                    top_insns.extend(then_insns);
+                    top_insns.push(Insn::Label(end_lable));
+                }
+            }
+        },
         HirStmt::Nil => {},
     }
     Ok(top_insns)
