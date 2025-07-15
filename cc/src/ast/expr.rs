@@ -38,6 +38,15 @@ impl Parser {
                     left: Box::new(left),
                     right: Box::new(right),
                 };
+            } else if let BinaryOp::Ternary = next_op {
+                let middle = self.expr(BinaryOp::MIN_PRECEDENCE)?;
+                self.eat(TokenType::Colon, "Expected ':' in ternary expression.")?;
+                right = self.expr(BinaryOp::Ternary.precedence())?;
+                left = Expr::Ternary {
+                    condition: Box::new(left),
+                    then_expr: Box::new(middle),
+                    else_expr: Box::new(right),
+                };
             } else {
                 right = self.expr(next_op.precedence() + 1)?;
                 left = Expr::Binary {

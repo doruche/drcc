@@ -73,4 +73,9 @@ mod tests {
     fn test_if() {
         test_inner("../testprogs/if.c");
     }
+
+    #[test]
+    fn test_ternary() {
+        test_inner("../testprogs/ternary.c");
+    }
 }

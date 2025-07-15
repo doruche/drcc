@@ -321,6 +321,44 @@ pub(super) fn parse_expr(
             }
             insns.push(insn);
             Ok((left_operand, Some(insns)))
-        }
+        },
+        HirExpr::Ternary { condition, then_expr, else_expr } => {
+            let mut top_insns = vec![];
+            let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_label_id)?;
+            if let Some(cond_insns) = cond_insns {
+                top_insns.extend(cond_insns);
+            }
+
+            let else_label = *next_label_id;
+            let end_label = else_label + 1;
+            let result_operand = Operand::Temp(*next_temp_id);
+            *next_temp_id += 1;
+
+            *next_label_id += 2;
+            top_insns.push(Insn::BranchIfZero {
+                src: cond_operand,
+                label: else_label,
+            });
+            let (then_operand, then_insns) = parse_expr(*then_expr, next_temp_id, next_label_id)?;
+            if let Some(then_insns) = then_insns {
+                top_insns.extend(then_insns);
+            }
+            top_insns.push(Insn::Move {
+                src: then_operand,
+                dst: result_operand,
+            });
+            top_insns.push(Insn::Jump(end_label));
+            top_insns.push(Insn::Label(else_label));
+            let (else_operand, else_insns) = parse_expr(*else_expr, next_temp_id, next_label_id)?;
+            if let Some(else_insns) = else_insns {
+                top_insns.extend(else_insns);
+            }
+            top_insns.push(Insn::Move {
+                src: else_operand,
+                dst: result_operand,
+            });
+            top_insns.push(Insn::Label(end_label));
+            Ok((result_operand, Some(top_insns)))
+        },
     }
 }

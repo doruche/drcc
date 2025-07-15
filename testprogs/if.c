@@ -21,3 +21,12 @@ another(void) {
         y = 4;
     return y;
 }
+
+int
+yet_another(void) {
+    int z = 0;
+    if (z == 0)
+        if (z == 1)
+            z = 2;
+    return z;
+}

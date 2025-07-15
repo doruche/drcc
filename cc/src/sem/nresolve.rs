@@ -168,6 +168,16 @@ impl Parser {
                 } else {
                     Err((SymError::InvalidLValue, span))
                 }
+            },
+            AstExpr::Ternary { condition, then_expr, else_expr } => {
+                let condition = self.nresolve_expr(*condition)?;
+                let then_expr = self.nresolve_expr(*then_expr)?;
+                let else_expr = self.nresolve_expr(*else_expr)?;
+                Ok(Expr::Ternary {
+                    condition: Box::new(condition),
+                    then_expr: Box::new(then_expr),
+                    else_expr: Box::new(else_expr),
+                })
             }
         };
         Ok(TypedExpr::untyped(inner?))

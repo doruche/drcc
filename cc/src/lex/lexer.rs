@@ -213,7 +213,15 @@ impl Lexer {
             '%' => {
                 self.advance();
                 Percent
-            }
+            },
+            '?' => {
+                self.advance();
+                QuestionMark
+            },
+            ':' => {
+                self.advance();
+                Colon
+            },
             '!' => {
                 self.advance();
                 if self.peek() == Some('=') {

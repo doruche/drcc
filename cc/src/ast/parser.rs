@@ -99,11 +99,11 @@ impl Parser {
         let mut token;
         while !self.is_at_end() {
             token = self.eat_current();
-            if token.get_type() == Semicolon {
+            if token.get_type() == RBrace {
                 break;
             }
             if let Some(next_token) = self.peek() {
-                if next_token.is_synchronizer() {
+                if next_token.get_type() == LBrace {
                     break;
                 }
             } else {

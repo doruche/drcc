@@ -140,6 +140,9 @@ impl Token {
             Plus | Hyphen | Asterisk | ForwardSlash | Percent |
             LessThan | GreaterThan | GtEq | LtEq | Equal | NotEqual |
             And | Or | DoubleAnd | DoubleOr | DoubleEqual
+            // Fake binary operators
+            | QuestionMark
+
         )
     }
 
@@ -160,6 +163,7 @@ impl Token {
             DoubleOr => AstBinaryOp::Or,
             DoubleEqual => AstBinaryOp::Equal,
             Equal => AstBinaryOp::Assign,
+            QuestionMark => AstBinaryOp::Ternary,
             // And => AstBinaryOp::BitwiseAnd,
             // Or => AstBinaryOp::BitwiseOr,
             // Equal => AstBinaryOp::Assign,

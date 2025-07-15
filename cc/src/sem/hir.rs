@@ -54,6 +54,11 @@ pub enum Expr {
         left: Box<TypedExpr>,
         right: Box<TypedExpr>,
     },
+    Ternary {
+        condition: Box<TypedExpr>,
+        then_expr: Box<TypedExpr>,
+        else_expr: Box<TypedExpr>,
+    },
     Group(Box<TypedExpr>),
     Unary((UnaryOp, Span), Box<TypedExpr>),
     Binary {
@@ -133,7 +138,9 @@ impl From<AstBinaryOp> for BinaryOp {
             AstBinaryOp::NotEqual => BinaryOp::NotEq,
             AstBinaryOp::And => BinaryOp::And,
             AstBinaryOp::Or => BinaryOp::Or,
-            AstBinaryOp::Assign => BinaryOp::Assign,
+
+            AstBinaryOp::Assign|
+            AstBinaryOp::Ternary => unreachable!(),
         }
     }
 }

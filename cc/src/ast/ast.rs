@@ -43,6 +43,11 @@ pub enum Expr {
         left: Box<Expr>,
         right: Box<Expr>,
     },
+    Ternary {
+        condition: Box<Expr>,
+        then_expr: Box<Expr>,
+        else_expr: Box<Expr>,
+    },
     Group(Box<Expr>),
     Unary((UnaryOp, Span), Box<Expr>),
     Binary {
@@ -91,12 +96,16 @@ pub enum BinaryOp {
     And,
     Or,
     Assign,
+    Ternary,
 }
 
 impl BinaryOp {
+    pub const MIN_PRECEDENCE: u8 = 0;
+
     pub fn precedence(&self) -> u8 {
         match self {
             BinaryOp::Assign => 0,
+            BinaryOp::Ternary => 1,
             BinaryOp::Or => 2,
             BinaryOp::And => 3,
             BinaryOp::Equal | BinaryOp::NotEqual => 4,
