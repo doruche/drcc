@@ -4,6 +4,7 @@ use crate::sem::{
     HirDecl,
     HirBlockItem,
     HirStmt,
+    HirForInit,
     HirTypedExpr,
     HirExpr,
     HirUnaryOp,
@@ -17,6 +18,7 @@ use super::{
     UnaryOp,
     BinaryOp,
     LabelOperand,
+    AutoGenLabel,
 };
 
 #[derive(Debug)]
@@ -45,16 +47,16 @@ impl Parser {
                 } => {
                     let mut body_insns = vec![];
                     let mut next_temp_id = 0;
-                    let mut next_label_id = 0;
+                    let mut next_branch_label = 0;
                     for stmt in body {
-                        let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_label_id)?;
+                        let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_branch_label)?;
                         body_insns.extend(insns);
                     }
                     // C standard specifies that a function without a return statement will
                     // return 0 if it is the main function, otherwise:
                     // 1. undefined behavior, if the value is used by the caller
                     // 2. works fine, if the value is not used by the caller
-                    // here, we insert a 'ret 0' instruction to make sure the standard is followed
+                    // hence, we insert a 'ret 0' instruction to make sure the standard is followed
                     body_insns.push(Insn::Return(Some(Operand::Imm(0))));
 
                     decls.push(Function {
@@ -74,7 +76,7 @@ impl Parser {
 pub(super) fn parse_block_item(
     item: HirBlockItem,
     next_temp_id: &mut usize,
-    next_label_id: &mut usize,
+    next_branch_label: &mut usize,
 ) -> Result<Vec<Insn>> {
     match item {
         HirBlockItem::Declaration(decl) => {
@@ -86,7 +88,7 @@ pub(super) fn parse_block_item(
                 let var = Operand::Var(name.0);
                 let mut insns = vec![];
                 if let Some(expr) = initializer {
-                    let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
+                    let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
                     if let Some(expr_insns) = expr_insns {
                         insns.extend(expr_insns);
                     }
@@ -100,19 +102,19 @@ pub(super) fn parse_block_item(
                 unreachable!();
             }
         },
-        HirBlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_label_id),
+        HirBlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_branch_label),
     }
 }
 
 pub(super) fn parse_stmt(
     stmt: HirStmt, 
     next_temp_id: &mut usize,
-    next_label_id: &mut usize
+    next_branch_label: &mut usize
 ) -> Result<Vec<Insn>> {
     let mut top_insns = vec![];
     match stmt {
         HirStmt::Return { span, expr } => {
-            let (operand, insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
+            let (operand, insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
                 let insn = Insn::Return(Some(operand));
                 let insns = match insns {
                     Some(mut vec) => {
@@ -124,41 +126,41 @@ pub(super) fn parse_stmt(
                 top_insns.extend(insns);
         },
         HirStmt::Expr(expr) => {
-            let (operand, insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
+            let (operand, insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
             if let Some(insns) = insns {
                 top_insns.extend(insns);
             }
         },
         HirStmt::If { condition, then_branch, else_branch } => {
-            let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_label_id)?;
+            let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_branch_label)?;
             if let Some(cond_insns) = cond_insns {
                 top_insns.extend(cond_insns);
             }
             match else_branch {
                 Some(else_branch) => {
-                    let else_label = LabelOperand::AutoGen(*next_label_id);
-                    let end_lable = LabelOperand::AutoGen(*next_label_id + 1);
-                    *next_label_id += 2;
+                    let else_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+                    let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
+                    *next_branch_label += 2;
                     top_insns.push(Insn::BranchIfZero {
                         src: cond_operand,
                         label: else_label,
                     });
-                    let then_insns = parse_stmt(*then_branch, next_temp_id, next_label_id)?;
+                    let then_insns = parse_stmt(*then_branch, next_temp_id, next_branch_label)?;
                     top_insns.extend(then_insns);
                     top_insns.push(Insn::Jump(end_lable));
                     top_insns.push(Insn::Label(else_label));
-                    let else_insns = parse_stmt(*else_branch, next_temp_id, next_label_id)?;
+                    let else_insns = parse_stmt(*else_branch, next_temp_id, next_branch_label)?;
                     top_insns.extend(else_insns);
                     top_insns.push(Insn::Label(end_lable));
                 },
                 None => {
-                    let end_lable = LabelOperand::AutoGen(*next_label_id);
-                    *next_label_id += 1;
+                    let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+                    *next_branch_label += 1;
                     top_insns.push(Insn::BranchIfZero {
                         src: cond_operand,
                         label: end_lable,
                     });
-                    let then_insns = parse_stmt(*then_branch, next_temp_id, next_label_id)?;
+                    let then_insns = parse_stmt(*then_branch, next_temp_id, next_branch_label)?;
                     top_insns.extend(then_insns);
                     top_insns.push(Insn::Label(end_lable));
                 }
@@ -166,11 +168,106 @@ pub(super) fn parse_stmt(
         },
         HirStmt::Compound(items) => {
             for item in items {
-                let insns = parse_block_item(item, next_temp_id, next_label_id)?;
+                let insns = parse_block_item(item, next_temp_id, next_branch_label)?;
                 top_insns.extend(insns);
             }
         },
         HirStmt::Nil => {},
+        HirStmt::Break { span, loop_label } => {
+            top_insns.push(Insn::Jump(LabelOperand::AutoGen(AutoGenLabel::Break(loop_label))));
+        }
+        HirStmt::Continue { span, loop_label } => {
+            top_insns.push(Insn::Jump(LabelOperand::AutoGen(AutoGenLabel::Continue(loop_label))));
+        },
+        HirStmt::While { span, controller, body, loop_label } => {
+            let con_label = LabelOperand::AutoGen(AutoGenLabel::Continue(loop_label));
+            let brk_label = LabelOperand::AutoGen(AutoGenLabel::Break(loop_label));
+
+            top_insns.push(Insn::Label(con_label));
+            let (ctrl_operand, ctrl_insns) = parse_expr(*controller, next_temp_id, next_branch_label)?;
+            if let Some(ctrl_insns) = ctrl_insns {
+                top_insns.extend(ctrl_insns);
+            }
+            top_insns.push(Insn::BranchIfZero {
+                src: ctrl_operand,
+                label: brk_label,
+            });
+            let body_insns = parse_stmt(*body, next_temp_id, next_branch_label)?;
+            top_insns.extend(body_insns);
+            top_insns.push(Insn::Jump(con_label));
+            top_insns.push(Insn::Label(brk_label));
+        },
+        HirStmt::DoWhile { span, body, controller, loop_label } => {
+            let con_label = LabelOperand::AutoGen(AutoGenLabel::Continue(loop_label));
+            let brk_label = LabelOperand::AutoGen(AutoGenLabel::Break(loop_label));
+            let start_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+            *next_branch_label += 1;
+
+            top_insns.push(Insn::Label(start_label));
+            let body_insns = parse_stmt(*body, next_temp_id, next_branch_label)?;
+            top_insns.extend(body_insns);
+            top_insns.push(Insn::Label(con_label));
+            let (ctrl_operand, ctrl_insns) = parse_expr(*controller, next_temp_id, next_branch_label)?;
+            if let Some(ctrl_insns) = ctrl_insns {
+                top_insns.extend(ctrl_insns);
+            }
+            top_insns.push(Insn::BranchNotZero {
+                src: ctrl_operand,
+                label: start_label,
+            });
+            top_insns.push(Insn::Label(brk_label));
+        },
+        HirStmt::For { 
+            span, 
+            initializer, 
+            controller, 
+            post, 
+            body, 
+            loop_label 
+        } => {
+            let con_label = LabelOperand::AutoGen(AutoGenLabel::Continue(loop_label));
+            let brk_label = LabelOperand::AutoGen(AutoGenLabel::Break(loop_label));
+            let start_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+            *next_branch_label += 1;
+
+            if let Some(init) = initializer {
+                match *init {
+                    HirForInit::Declaration(decl) => {
+                        let insns = parse_block_item(HirBlockItem::Declaration(decl), next_temp_id, next_branch_label)?;
+                        top_insns.extend(insns);
+                    },
+                    HirForInit::Expression(expr) => {
+                        let (_, insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
+                        if let Some(insns) = insns {
+                            top_insns.extend(insns);
+                        }
+                    }
+                }
+            }
+            top_insns.push(Insn::Label(start_label));
+            if let Some(ctrl) = controller {
+                let (ctrl_operand, ctrl_insns) = parse_expr(*ctrl, next_temp_id, next_branch_label)?;
+                if let Some(ctrl_insns) = ctrl_insns {
+                    top_insns.extend(ctrl_insns);
+                }
+                top_insns.push(Insn::BranchIfZero {
+                    src: ctrl_operand,
+                    label: brk_label,
+                });
+            }
+            let body_insns = parse_stmt(*body, next_temp_id, next_branch_label)?;
+            top_insns.extend(body_insns);
+            top_insns.push(Insn::Label(con_label));
+            if let Some(post) = post {
+                let (_, insns) = parse_expr(*post, next_temp_id, next_branch_label)?;
+                if let Some(insns) = insns {
+                    top_insns.extend(insns);
+                }
+            }
+            top_insns.push(Insn::Jump(start_label));
+            top_insns.push(Insn::Label(brk_label));
+        },
+        _ => unimplemented!(),
     }
     Ok(top_insns)
 }
@@ -179,7 +276,7 @@ pub(super) fn parse_stmt(
 pub(super) fn parse_expr(
     expr: HirTypedExpr, 
     next_temp_id: &mut usize,
-    next_label_id: &mut usize,
+    next_branch_label: &mut usize,
 ) -> Result<(Operand, Option<Vec<Insn>>)> {
     let type_ = expr.type_;
     let expr = expr.expr;
@@ -188,7 +285,7 @@ pub(super) fn parse_expr(
             Ok((Operand::Imm(val), None))
         },
         HirExpr::Unary((op, span), expr) => {
-            let (src, mut insns) = parse_expr(*expr, next_temp_id, next_label_id)?;
+            let (src, mut insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
             let temp_id = *next_temp_id;
             *next_temp_id += 1;
             let insn = Insn::Unary {
@@ -206,7 +303,7 @@ pub(super) fn parse_expr(
             Ok((Operand::Temp(temp_id), insns))
         }
         HirExpr::Group(inner) => {
-            parse_expr(*inner, next_temp_id, next_label_id)
+            parse_expr(*inner, next_temp_id, next_branch_label)
         }
         HirExpr::Binary { op: (op, span), left, right } => {
             let op = op.into();
@@ -214,11 +311,11 @@ pub(super) fn parse_expr(
             match op {
                 And|Or => {
                     let mut top_insns = vec![];
-                    let short_lable = LabelOperand::AutoGen(*next_label_id);
-                    let end_lable = LabelOperand::AutoGen(*next_label_id + 1);
-                    *next_label_id += 2;
+                    let short_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+                    let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
+                    *next_branch_label += 2;
 
-                    let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
+                    let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
                     if let Some(left_insns) = left_insns {
                         top_insns.extend(left_insns);
                     }
@@ -234,7 +331,7 @@ pub(super) fn parse_expr(
                         });
                     }
 
-                    let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
+                    let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
                     if let Some(right_insns) = right_insns {
                         top_insns.extend(right_insns);
                     }
@@ -280,8 +377,8 @@ pub(super) fn parse_expr(
                 },
                 Add|Sub|Mul|Div|Rem|
                 Ls|Gt|GtEq|LsEq|Eq|NotEq => {
-                    let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
-                    let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
+                    let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
+                    let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
                     let temp_id = *next_temp_id;
                     *next_temp_id += 1;
                     let insn = Insn::Binary {
@@ -310,8 +407,8 @@ pub(super) fn parse_expr(
             ))
         },
         HirExpr::Assignment { span, left, right } => {
-            let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
-            let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_label_id)?;
+            let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
+            let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
             
             let insn = Insn::Move {
                 src: right_operand,
@@ -330,22 +427,22 @@ pub(super) fn parse_expr(
         },
         HirExpr::Ternary { condition, then_expr, else_expr } => {
             let mut top_insns = vec![];
-            let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_label_id)?;
+            let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_branch_label)?;
             if let Some(cond_insns) = cond_insns {
                 top_insns.extend(cond_insns);
             }
 
-            let else_label = LabelOperand::AutoGen(*next_label_id);
-            let end_label = LabelOperand::AutoGen(*next_label_id + 1);
+            let else_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+            let end_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
             let result_operand = Operand::Temp(*next_temp_id);
             *next_temp_id += 1;
 
-            *next_label_id += 2;
+            *next_branch_label += 2;
             top_insns.push(Insn::BranchIfZero {
                 src: cond_operand,
                 label: else_label,
             });
-            let (then_operand, then_insns) = parse_expr(*then_expr, next_temp_id, next_label_id)?;
+            let (then_operand, then_insns) = parse_expr(*then_expr, next_temp_id, next_branch_label)?;
             if let Some(then_insns) = then_insns {
                 top_insns.extend(then_insns);
             }
@@ -355,7 +452,7 @@ pub(super) fn parse_expr(
             });
             top_insns.push(Insn::Jump(end_label));
             top_insns.push(Insn::Label(else_label));
-            let (else_operand, else_insns) = parse_expr(*else_expr, next_temp_id, next_label_id)?;
+            let (else_operand, else_insns) = parse_expr(*else_expr, next_temp_id, next_branch_label)?;
             if let Some(else_insns) = else_insns {
                 top_insns.extend(else_insns);
             }

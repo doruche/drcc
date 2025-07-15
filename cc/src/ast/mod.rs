@@ -18,6 +18,7 @@ use ast::{
     BlockItem,
     UnaryOp,
     BinaryOp,
+    ForInit,
 };
 use crate::common::{DataType, Span, StrDescriptor};
 
@@ -30,6 +31,7 @@ pub use ast::{
     BlockItem as AstBlockItem,
     UnaryOp as AstUnaryOp,
     BinaryOp as AstBinaryOp,
+    ForInit as AstForInit,
 };
 
 #[cfg(test)]
@@ -96,5 +98,10 @@ mod tests {
     #[test]
     fn test_compound() {
         test_inner("../testprogs/compound.c");
+    }
+
+    #[test]
+    fn test_loop() {
+        test_inner("../testprogs/loop.c");
     }
 }

@@ -16,6 +16,7 @@ use super::{
     Decl,
     BlockItem,
     Stmt,
+    ForInit,
     TypedExpr,
     Expr,
     UnaryOp,
@@ -27,6 +28,7 @@ use crate::ast::{
     AstBlockItem,
     AstStmt,
     AstExpr,
+    AstForInit,
     AstUnaryOp,
     AstBinaryOp,
 };
@@ -132,6 +134,55 @@ impl Parser {
                 self.symtb.exit_block();
                 Ok(Stmt::Compound(r_items))
             },
+            AstStmt::Break(span) => 
+                Ok(Stmt::Break { span, loop_label: usize::MAX }),
+            AstStmt::Continue(span) =>
+                Ok(Stmt::Continue { span, loop_label: usize::MAX }),
+            AstStmt::While { span, controller, body } => {
+                let controller = self.nresolve_expr(*controller)?;
+                let body = self.nresolve_stmt(*body)?;
+                Ok(Stmt::While {
+                    span,
+                    controller: Box::new(controller),
+                    body: Box::new(body),
+                    loop_label: usize::MAX,
+                })
+            },
+            AstStmt::DoWhile { span, body, controller } => {
+                let body = self.nresolve_stmt(*body)?;
+                let controller = self.nresolve_expr(*controller)?;
+                Ok(Stmt::DoWhile {
+                    span,
+                    body: Box::new(body),
+                    controller: Box::new(controller),
+                    loop_label: usize::MAX,
+                })
+            },
+            AstStmt::For { span, initializer, controller, post, body } => {
+                self.symtb.enter_block();
+                let r_initializer = initializer
+                    .map(|init| self.nresolve_for_init(*init))
+                    .transpose()?
+                    .map(Box::new);
+                let r_controller = controller
+                    .map(|expr| self.nresolve_expr(*expr))
+                    .transpose()?
+                    .map(Box::new);
+                let r_post = post
+                    .map(|expr| self.nresolve_expr(*expr))
+                    .transpose()?
+                    .map(Box::new);
+                let body = self.nresolve_stmt(*body)?;
+                self.symtb.exit_block();
+                Ok(Stmt::For {
+                    span,
+                    initializer: r_initializer,
+                    controller: r_controller,
+                    post: r_post,
+                    body: Box::new(body),
+                    loop_label: usize::MAX,
+                })
+            },
         }
     }
 
@@ -191,5 +242,21 @@ impl Parser {
             }
         };
         Ok(TypedExpr::untyped(inner?))
+    }
+
+    fn nresolve_for_init(
+        &mut self,
+        init: AstForInit,
+    ) -> Result<ForInit, (SymError, Span)> {
+        match init {
+            AstForInit::Declaration(decl) => {
+                let decl = self.nresolve_decl(decl)?;
+                Ok(ForInit::Declaration(decl))
+            },
+            AstForInit::Expression(expr) => {
+                let expr = self.nresolve_expr(expr)?;
+                Ok(ForInit::Expression(Box::new(expr)))
+            }
+        }
     }
 }

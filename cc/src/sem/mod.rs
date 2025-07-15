@@ -3,7 +3,7 @@
 //! Bake in type information, resolved names, etc.
 //! Current passes:
 //! 1. Name resolution
-//! 2. Loop labeling
+//! 2. Label resolution
 //! 3. Type checking (not implemented yet)
 
 
@@ -12,6 +12,7 @@ mod hir;
 mod symtb;
 mod parse;
 mod nresolve;
+mod lresolve;
 mod typecheck;
 
 use symtb::{
@@ -25,6 +26,7 @@ use hir::{
     Decl,
     BlockItem,
     Stmt,
+    ForInit,
     TypedExpr,
     Expr,
     UnaryOp,
@@ -37,6 +39,7 @@ pub use hir::{
     Decl as HirDecl,
     BlockItem as HirBlockItem,
     Stmt as HirStmt,
+    ForInit as HirForInit,
     TypedExpr as HirTypedExpr,
     Expr as HirExpr,
     UnaryOp as HirUnaryOp,
@@ -88,5 +91,15 @@ mod tests {
     #[test]
     fn test_compound() {
         test_inner("../testprogs/compound.c");
+    }
+
+    #[test]
+    fn test_loop() {
+        test_inner("../testprogs/loop.c");
+    }
+
+    #[test]
+    fn test_control_flow() {
+        test_inner("../testprogs/control_flow.c");
     }
 }

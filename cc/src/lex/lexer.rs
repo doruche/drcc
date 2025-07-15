@@ -9,7 +9,7 @@ pub struct Lexer {
     has_error: bool,
     cur_line: usize,
     cur_column: usize,
-    pool: StringPool,
+    strtb: StringPool,
 }
 
 impl Lexer {
@@ -21,7 +21,7 @@ impl Lexer {
             has_error: false,
             cur_line: 1,
             cur_column: 1,
-            pool: StringPool::new(),
+            strtb: StringPool::new(),
         }
     }
 
@@ -44,7 +44,7 @@ impl Lexer {
         if self.has_error {
             Err(Error::Errors(errors.into()))
         } else {
-            Ok((tokens, self.pool))
+            Ok((tokens, self.strtb))
         }
     }
 
@@ -141,8 +141,13 @@ impl Lexer {
             "void" => Ok(Token::new(RawToken::Void, span)),
             "if" => Ok(Token::new(RawToken::If, span)),
             "else" => Ok(Token::new(RawToken::Else, span)),
+            "while" => Ok(Token::new(RawToken::While, span)),
+            "do" => Ok(Token::new(RawToken::Do, span)),
+            "for" => Ok(Token::new(RawToken::For, span)),
+            "break" => Ok(Token::new(RawToken::Break, span)),
+            "continue" => Ok(Token::new(RawToken::Continue, span)),
             _ => {
-                let sd = self.pool.intern(identifier_str.clone());
+                let sd = self.strtb.intern(identifier_str.clone());
                 Ok(Token::new(RawToken::Identifier(sd), span))
             },
         }

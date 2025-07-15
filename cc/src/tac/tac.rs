@@ -40,11 +40,18 @@ pub enum Operand {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelOperand {
-    AutoGen(usize),
+    AutoGen(AutoGenLabel),
     Named {
         name: StrDescriptor,
         id: usize,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoGenLabel {
+    Branch(usize),  // normal auto-generated label for branches and loops
+    Continue(usize),
+    Break(usize),
 }
 
 #[derive(Debug, Clone)]

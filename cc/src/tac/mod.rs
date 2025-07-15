@@ -16,6 +16,7 @@ pub use tac::{
     UnaryOp as TacUnaryOp,
     BinaryOp as TacBinaryOp,
     LabelOperand as TacLabelOperand,
+    AutoGenLabel as TacAutoGenLabel,
 };
 
 use tac::{
@@ -26,6 +27,7 @@ use tac::{
     UnaryOp,
     BinaryOp,
     LabelOperand,
+    AutoGenLabel,
 };
 
 
@@ -114,5 +116,15 @@ mod tests {
     #[test]
     fn test_compound() {
         test_inner("../testprogs/compound.c");
+    }
+
+    #[test]
+    fn test_loop() {
+        test_inner("../testprogs/loop.c");
+    }
+
+    #[test]
+    fn test_control_flow() {
+        test_inner("../testprogs/control_flow.c");
     }
 }

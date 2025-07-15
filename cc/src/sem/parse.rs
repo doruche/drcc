@@ -21,12 +21,17 @@ use super::{
 #[derive(Debug)]
 pub struct Parser {
     pub(super) symtb: SymbolTable,
+
+    pub(super) label_counter: usize,
+    pub(super) loop_labels: Vec<usize>,
 }
 
 impl Parser {
     pub fn new() -> Self {
         Self {
             symtb: SymbolTable::new(),
+            label_counter: 0,
+            loop_labels: vec![],
         }
     }
 
@@ -34,17 +39,13 @@ impl Parser {
         mut self, 
         ast: AstTopLevel,
     ) -> Result<TopLevel> {
-        // we'll do several passes here.
-        // 1. build the symbol table, while resolving names
-        // 2. type check
-        // currently, we only do the first pass.
-
-        let mut decls = vec![];
         let strtb = ast.strtb;
+
+        let mut nresolve_pass_decls = vec![];
 
         for decl in ast.decls {
             match self.nresolve_decl(decl) {
-                Ok(decl) => decls.push(decl),
+                Ok(decl) => nresolve_pass_decls.push(decl),
                 Err((sym_e, span)) => match sym_e {
                     SymError::DuplicateDecl(sd) =>
                         return Err(Error::semantic(format!(
@@ -61,6 +62,13 @@ impl Parser {
                 }
             }
         }
+
+        let mut lresolve_pass_decls = vec![];
+        for decl in nresolve_pass_decls {
+            lresolve_pass_decls.push(self.lresolve_decl(decl)?);
+        }
+
+        let decls = lresolve_pass_decls;
 
         Ok(TopLevel {
             decls,

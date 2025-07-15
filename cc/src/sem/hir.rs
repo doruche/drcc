@@ -80,8 +80,42 @@ pub enum Stmt {
         then_branch: Box<Stmt>,
         else_branch: Option<Box<Stmt>>,
     },
+    Break {
+        span: Span,
+        loop_label: usize,
+    },
+    Continue {
+        span: Span,
+        loop_label: usize,
+    },
+    While {
+        span: Span,
+        controller: Box<TypedExpr>,
+        body: Box<Stmt>,
+        loop_label: usize,
+    },
+    DoWhile {
+        span: Span,
+        body: Box<Stmt>,
+        controller: Box<TypedExpr>,
+        loop_label: usize,
+    },
+    For {
+        span: Span,
+        initializer: Option<Box<ForInit>>,
+        controller: Option<Box<TypedExpr>>,
+        post: Option<Box<TypedExpr>>,
+        body: Box<Stmt>,
+        loop_label: usize,
+    },
     Compound(Vec<BlockItem>),
     Nil,
+}
+
+#[derive(Debug)]
+pub enum ForInit {
+    Declaration(Decl),
+    Expression(Box<TypedExpr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -70,7 +70,32 @@ pub enum Stmt {
         else_branch: Option<Box<Stmt>>,
     },
     Compound(Vec<BlockItem>),
+    Break(Span),
+    Continue(Span),
+    While {
+        span: Span,
+        controller: Box<Expr>,
+        body: Box<Stmt>,
+    },
+    DoWhile {
+        span: Span,
+        body: Box<Stmt>,
+        controller: Box<Expr>,
+    },
+    For {
+        span: Span,
+        initializer: Option<Box<ForInit>>,
+        controller: Option<Box<Expr>>,
+        post: Option<Box<Expr>>,
+        body: Box<Stmt>,
+    },
     Nil,
+}
+
+#[derive(Debug, Clone)]
+pub enum ForInit {
+    Declaration(Decl),
+    Expression(Expr),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
