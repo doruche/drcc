@@ -15,6 +15,7 @@ pub use tac::{
     TopLevel as TacTopLevel,
     UnaryOp as TacUnaryOp,
     BinaryOp as TacBinaryOp,
+    LabelOperand as TacLabelOperand,
 };
 
 use tac::{
@@ -24,6 +25,7 @@ use tac::{
     TopLevel,
     UnaryOp,
     BinaryOp,
+    LabelOperand,
 };
 
 

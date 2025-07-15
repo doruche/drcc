@@ -1,6 +1,12 @@
 //! Semantic analysis module.
 //! AST -> HIR
 //! Bake in type information, resolved names, etc.
+//! Current passes:
+//! 1. Name resolution
+//! 2. Loop labeling
+//! 3. Type checking (not implemented yet)
+
+
 
 mod hir;
 mod symtb;

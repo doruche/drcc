@@ -9,7 +9,6 @@ use crate::sem::{
     HirUnaryOp,
     HirBinaryOp,
 };
-
 use super::{
     Operand,
     Insn,
@@ -17,6 +16,7 @@ use super::{
     TopLevel,
     UnaryOp,
     BinaryOp,
+    LabelOperand,
 };
 
 #[derive(Debug)]
@@ -136,8 +136,8 @@ pub(super) fn parse_stmt(
             }
             match else_branch {
                 Some(else_branch) => {
-                    let else_label = *next_label_id;
-                    let end_lable = else_label + 1;
+                    let else_label = LabelOperand::AutoGen(*next_label_id);
+                    let end_lable = LabelOperand::AutoGen(*next_label_id + 1);
                     *next_label_id += 2;
                     top_insns.push(Insn::BranchIfZero {
                         src: cond_operand,
@@ -152,7 +152,7 @@ pub(super) fn parse_stmt(
                     top_insns.push(Insn::Label(end_lable));
                 },
                 None => {
-                    let end_lable = *next_label_id;
+                    let end_lable = LabelOperand::AutoGen(*next_label_id);
                     *next_label_id += 1;
                     top_insns.push(Insn::BranchIfZero {
                         src: cond_operand,
@@ -214,8 +214,8 @@ pub(super) fn parse_expr(
             match op {
                 And|Or => {
                     let mut top_insns = vec![];
-                    let short_lable = *next_label_id;
-                    let end_lable = *next_label_id + 1;
+                    let short_lable = LabelOperand::AutoGen(*next_label_id);
+                    let end_lable = LabelOperand::AutoGen(*next_label_id + 1);
                     *next_label_id += 2;
 
                     let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_label_id)?;
@@ -335,8 +335,8 @@ pub(super) fn parse_expr(
                 top_insns.extend(cond_insns);
             }
 
-            let else_label = *next_label_id;
-            let end_label = else_label + 1;
+            let else_label = LabelOperand::AutoGen(*next_label_id);
+            let end_label = LabelOperand::AutoGen(*next_label_id + 1);
             let result_operand = Operand::Temp(*next_temp_id);
             *next_temp_id += 1;
 

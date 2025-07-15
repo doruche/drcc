@@ -6,6 +6,7 @@ use super::{
     TopLevel,
     UnaryOp,
     BinaryOp,
+    LabelOperand,
 };
 
 impl TopLevel {
@@ -91,11 +92,11 @@ impl TopLevel {
                 }
             },
             Insn::BranchIfZero { src, label }
-                => format!("bz {}, L.{}", self.emit_operand(src), label),
+                => format!("bz {}, {}", self.emit_operand(src), self.emit_label_operand(label)),
             Insn::BranchNotZero { src, label }
-                => format!("bnz {}, L.{}", self.emit_operand(src), label),
-            Insn::Label(lid) => format!("L.{}", lid),
-            Insn::Jump(lid) => format!("jmp L.{}", lid),
+                => format!("bnz {}, {}", self.emit_operand(src), self.emit_label_operand(label)),
+            Insn::Label(label) => self.emit_label_operand(label),
+            Insn::Jump(label) => format!("jmp {}", self.emit_label_operand(label)),
             Insn::Move { src, dst} => 
                 format!("mov {}, {}", self.emit_operand(dst), self.emit_operand(src)),
         }
@@ -109,6 +110,16 @@ impl TopLevel {
                 let name = self.strtb.get(*sd).unwrap();
                 format!("{}", name)
             },
+        }
+    }
+
+    fn emit_label_operand(&self, label: &LabelOperand) -> String {
+        match label {
+            LabelOperand::AutoGen(id) => format!("L.{}", id),
+            LabelOperand::Named { name, id } => {
+                let name_str = self.strtb.get(*name).unwrap();
+                format!("{}.{}", name_str, id)
+            }
         }
     }
 }

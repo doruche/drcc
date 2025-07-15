@@ -38,6 +38,15 @@ pub enum Operand {
     Temp(usize),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelOperand {
+    AutoGen(usize),
+    Named {
+        name: StrDescriptor,
+        id: usize,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub enum Insn {
     Return(Option<Operand>),
@@ -52,15 +61,15 @@ pub enum Insn {
         right: Operand,
         dst: Operand,
     },
-    Label(usize),
-    Jump(usize),
+    Label(LabelOperand),
+    Jump(LabelOperand),
     BranchIfZero {
         src: Operand,
-        label: usize,
+        label: LabelOperand,
     },
     BranchNotZero {
         src: Operand,
-        label: usize,
+        label: LabelOperand,
     },
     Move {
         src: Operand,
