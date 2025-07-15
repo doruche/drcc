@@ -164,6 +164,12 @@ pub(super) fn parse_stmt(
                 }
             }
         },
+        HirStmt::Compound(items) => {
+            for item in items {
+                let insns = parse_block_item(item, next_temp_id, next_label_id)?;
+                top_insns.extend(insns);
+            }
+        },
         HirStmt::Nil => {},
     }
     Ok(top_insns)

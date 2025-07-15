@@ -52,6 +52,15 @@ impl Parser {
                     else_branch,
                 })
             },
+            TokenType::LBrace => {
+                self.eat_current();
+                let mut items = vec![];
+                while !self.is_at_end() && self.peek().unwrap().get_type() != TokenType::RBrace {
+                    items.push(self.block_item()?);
+                }
+                self.eat(TokenType::RBrace, "Expected '}' to close block statement.")?;
+                Ok(Stmt::Compound(items))
+            },
             _ => {
                 // expression statement
                 let expr = self.parse_expr()?;

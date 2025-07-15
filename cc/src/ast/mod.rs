@@ -92,4 +92,9 @@ mod tests {
     fn test_ternary() {
         test_inner("../testprogs/ternary.c");
     }
+
+    #[test]
+    fn test_compound() {
+        test_inner("../testprogs/compound.c");
+    }
 }

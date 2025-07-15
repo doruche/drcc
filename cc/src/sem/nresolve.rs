@@ -46,12 +46,13 @@ impl Parser {
                     name.0,
                     return_type.0,
                 ).map_err(|e| (e, name.1))?;
-                self.symtb.enter_scope();
+                self.symtb.clear_labels();
+                self.symtb.enter_block();
                 let mut r_body = vec![];
                 for item in body {
                     r_body.push(self.nresolve_block_item(item)?);
                 }
-                self.symtb.exit_scope();
+                self.symtb.exit_block();
                 Ok(Decl::FuncDecl {
                     return_type,
                     name,
@@ -121,6 +122,15 @@ impl Parser {
                     then_branch: Box::new(then_branch),
                     else_branch: else_branch.map(Box::new),
                 })
+            },
+            AstStmt::Compound(items) => {
+                self.symtb.enter_block();
+                let mut r_items = vec![];
+                for item in items {
+                    r_items.push(self.nresolve_block_item(item)?);
+                }
+                self.symtb.exit_block();
+                Ok(Stmt::Compound(r_items))
             },
         }
     }

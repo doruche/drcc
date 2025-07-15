@@ -21,6 +21,11 @@ pub struct FuncSymbol {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LabelSymbol {
+    pub(super) name: StrDescriptor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymError {
     DuplicateDecl(StrDescriptor),
     NotFound(StrDescriptor),
@@ -34,6 +39,7 @@ pub enum SymError {
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
     var_ns: Vec<HashMap<StrDescriptor, VarSymbol>>,
+    label_ns: HashMap<StrDescriptor, usize>,
     func_ns: HashMap<StrDescriptor, FuncSymbol>,    // C does not allow nested functions.
     // func_ns
 }
@@ -42,16 +48,37 @@ impl SymbolTable {
     pub fn new() -> Self {
         Self {
             var_ns: vec![HashMap::new()],
+            label_ns: HashMap::new(),
             func_ns: HashMap::new(),
             // func_ns: vec![],
         }
     }
 
-    pub fn enter_scope(&mut self) {
+    // This must be called before any function definition.
+    pub fn clear_labels(&mut self) {
+        self.label_ns.clear();
+    }
+
+    pub fn def_label(&mut self, name: StrDescriptor) -> Result<(), SymError> {
+        if self.label_ns.contains_key(&name) {
+            return Err(SymError::DuplicateDecl(name));
+        }
+        let index = self.label_ns.len();
+        self.label_ns.insert(name, index);
+        Ok(())
+    }
+
+    pub fn lookup_label(&self, name: StrDescriptor) -> Result<usize, SymError> {
+        self.label_ns.get(&name)
+            .copied()
+            .ok_or(SymError::NotFound(name))
+    }
+
+    pub fn enter_block(&mut self) {
         self.var_ns.push(HashMap::new());
     }
 
-    pub fn exit_scope(&mut self) {
+    pub fn exit_block(&mut self) {
         if self.var_ns.len() == 1 {
             panic!("Cannot exit global scope");
         }
