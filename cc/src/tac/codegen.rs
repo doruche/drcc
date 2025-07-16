@@ -43,27 +43,29 @@ impl Parser {
                 HirDecl::FuncDecl { 
                     return_type, 
                     name, 
+                    params,
                     body 
                 } => {
-                    let mut body_insns = vec![];
-                    let mut next_temp_id = 0;
-                    let mut next_branch_label = 0;
-                    for stmt in body {
-                        let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_branch_label)?;
-                        body_insns.extend(insns);
-                    }
-                    // C standard specifies that a function without a return statement will
-                    // return 0 if it is the main function, otherwise:
-                    // 1. undefined behavior, if the value is used by the caller
-                    // 2. works fine, if the value is not used by the caller
-                    // hence, we insert a 'ret 0' instruction to make sure the standard is followed
-                    body_insns.push(Insn::Return(Some(Operand::Imm(0))));
+                    todo!()
+                    // let mut body_insns = vec![];
+                    // let mut next_temp_id = 0;
+                    // let mut next_branch_label = 0;
+                    // for stmt in body {
+                    //     let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_branch_label)?;
+                    //     body_insns.extend(insns);
+                    // }
+                    // // C standard specifies that a function without a return statement will
+                    // // return 0 if it is the main function, otherwise:
+                    // // 1. undefined behavior, if the value is used by the caller
+                    // // 2. works fine, if the value is not used by the caller
+                    // // hence, we insert a 'ret 0' instruction to make sure the standard is followed
+                    // body_insns.push(Insn::Return(Some(Operand::Imm(0))));
 
-                    decls.push(Function {
-                        name: name.0,
-                        return_type: return_type.0,
-                        body: body_insns,
-                    });
+                    // decls.push(Function {
+                    //     name: name.0,
+                    //     return_type: return_type.0,
+                    //     body: body_insns,
+                    // });
                 },
                 HirDecl::VarDecl{..} => unimplemented!(),
             }
@@ -305,6 +307,9 @@ pub(super) fn parse_expr(
         HirExpr::Group(inner) => {
             parse_expr(*inner, next_temp_id, next_branch_label)
         }
+        HirExpr::FuncCall { name, span, args } => {
+            todo!()
+        },
         HirExpr::Binary { op: (op, span), left, right } => {
             let op = op.into();
             use BinaryOp::*;

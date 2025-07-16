@@ -2,6 +2,8 @@
 
 use crate::common::*;
 
+use crate::ast::AstParam;
+
 #[derive(Debug)]
 pub struct TopLevel {
     pub decls: Vec<Decl>,
@@ -14,19 +16,42 @@ pub enum BlockItem {
     Statement(Stmt),
 }
 
+
 #[derive(Debug)]
 pub enum Decl {
     FuncDecl {
         return_type: (DataType, Span),
         name: (StrDescriptor, Span),
-        // params,
-        body: Vec<BlockItem>,
+        params: Vec<Param>,
+        body: Option<Vec<BlockItem>>,
     },
     VarDecl {
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
         initializer: Option<Box<TypedExpr>>,
-        // initial value,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Param {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+    pub span: Span,
+}
+
+impl Param {
+    pub fn type_eq(&self, other: &Param) -> bool {
+        self.data_type == other.data_type
+    }
+}
+
+impl From<AstParam> for Param {
+    fn from(value: AstParam) -> Self {
+        Self {
+            name: value.name,
+            data_type: value.data_type,
+            span: value.span,
+        }
     }
 }
 
@@ -53,6 +78,11 @@ pub enum Expr {
         span: Span,
         left: Box<TypedExpr>,
         right: Box<TypedExpr>,
+    },
+    FuncCall {
+        name: StrDescriptor,
+        span: Span,
+        args: Vec<TypedExpr>,
     },
     Ternary {
         condition: Box<TypedExpr>,

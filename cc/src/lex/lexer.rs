@@ -227,6 +227,10 @@ impl Lexer {
                 self.advance();
                 Colon
             },
+            ',' => {
+                self.advance();
+                Comma
+            },
             '!' => {
                 self.advance();
                 if self.peek() == Some('=') {

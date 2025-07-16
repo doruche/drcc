@@ -26,19 +26,28 @@ impl Parser {
             Decl::FuncDecl {
                 return_type,
                 name,
+                params,
                 body,
             } => {
                 // reset label counter for each function
-                self.label_counter = 0;
-                self.loop_labels.clear();
-                let mut r_body = vec![];
-                for item in body {
-                    r_body.push(self.lresolve_block_item(item)?);
-                }
-                assert!(self.loop_labels.is_empty(), "Loop labels should be empty after resolving function body.");
+                let r_body = if let Some(body) = body {
+                    self.label_counter = 0;
+                    self.loop_labels.clear();
+                    let mut r_body = vec![];
+                    for item in body {
+                        r_body.push(self.lresolve_block_item(item)?);
+                    }
+                    assert!(self.loop_labels.is_empty(), "Loop labels should be empty after resolving function body.");
+                    Some(r_body)
+                } else {
+                    None
+                };
                 Ok(Decl::FuncDecl {
                     return_type,
                     name,
+                    params: params.into_iter()
+                        .map(|param| param.into())
+                        .collect(),
                     body: r_body,
                 })
             }
@@ -51,6 +60,7 @@ impl Parser {
     ) -> Result<BlockItem> {
         match item {
             // if the item is a declaration, then it must be a variable declaration,
+            // or a function declaration inside another function, which does not have a body,
             // so there is no need to resolve it further
             decl@BlockItem::Declaration(..) => Ok(decl),
             BlockItem::Statement(stmt) => Ok(BlockItem::Statement(self.lresolve_stmt(stmt)?)),

@@ -4,7 +4,9 @@
 use crate::common::{
     StrDescriptor,
     Span,
-    Error
+    Error,
+    FuncType,
+    Linkage,
 };
 use super::{
     Parser,
@@ -42,23 +44,51 @@ impl Parser {
             AstDecl::FuncDecl {
                 return_type,
                 name,
+                params,
                 body,
             } => {
-                self.symtb.def_func(
-                    name.0,
-                    return_type.0,
-                ).map_err(|e| (e, name.1))?;
-                self.symtb.clear_labels();
-                self.symtb.enter_block();
-                let mut r_body = vec![];
-                for item in body {
-                    r_body.push(self.nresolve_block_item(item)?);
-                }
-                self.symtb.exit_block();
+                let functype = FuncType {
+                    return_type: return_type.0,
+                    param_types: params.iter()
+                        .map(|param| param.data_type)
+                        .collect(),
+                };
+
+                let body = if let Some(body) = body {
+                    self.symtb.ndecl_func(
+                        name.0,
+                        functype,
+                        Linkage::External,
+                    ).map_err(|e| (e, name.1))?;
+                    self.symtb.enter_block();
+
+                    for param in &params {
+                        self.symtb.ndef_var(param.name)
+                            .map_err(|e| (e, param.span))?;
+                    }
+
+                    let mut r_body = vec![];
+                    for item in body {
+                        r_body.push(self.nresolve_block_item(item)?);
+                    }
+                    self.symtb.exit_block();
+                    Some(r_body)
+                } else {
+                    self.symtb.ndecl_func(
+                        name.0,
+                        functype,
+                        Linkage::Internal,
+                    ).map_err(|e| (e, name.1))?;
+                    None
+                };
+                
                 Ok(Decl::FuncDecl {
                     return_type,
                     name,
-                    body: r_body,
+                    params: params.into_iter()
+                        .map(|param| param.into())
+                        .collect(),
+                    body,
                 })
             },
             AstDecl::VarDecl { 
@@ -66,7 +96,7 @@ impl Parser {
                 data_type, 
                 initializer 
             } => {
-                self.symtb.def_var(name.0, data_type.0)
+                self.symtb.ndef_var(name.0)
                     .map_err(|e| (e, name.1))?;
                 let r_initializer = initializer
                     .map(|expr| self.nresolve_expr(*expr))
@@ -193,7 +223,7 @@ impl Parser {
         let inner = match expr {
             AstExpr::IntegerLiteral(value) => Ok(Expr::IntegerLiteral(value)),
             AstExpr::Variable(name, span) => {
-                let _symbol = self.symtb.lookup_var(name)
+                let () = self.symtb.nlookup_var(name)
                     .map_err(|sym_e| (sym_e, span))?;
                 Ok(Expr::Variable(name, span))
             },
@@ -218,7 +248,7 @@ impl Parser {
                 // currently, only variable assignment is supported.
                 let left = *left;
                 if let AstExpr::Variable(name, span) = left {
-                    let _symbol = self.symtb.lookup_var(name)
+                    let _symbol = self.symtb.nlookup_var(name)
                         .map_err(|sym_e| (sym_e, span))?;
                     let right = self.nresolve_expr(*right)?;
                     Ok(Expr::Assignment {
@@ -240,6 +270,22 @@ impl Parser {
                     else_expr: Box::new(else_expr),
                 })
             }
+            AstExpr::FuncCall { name, span, args } => {
+                // we won't do any type checking here, just ensure the function exists
+                // and resolve the arguments.
+                let () = self.symtb.nlookup_func(name)
+                    .map_err(|sym_e| (sym_e, span))?;
+                let mut r_args = vec![];
+                for arg in args {
+                    let arg = self.nresolve_expr(arg)?;
+                    r_args.push(arg);
+                }
+                Ok(Expr::FuncCall {
+                    name,
+                    span,
+                    args: r_args,
+                })
+            },
         };
         Ok(TypedExpr::untyped(inner?))
     }

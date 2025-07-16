@@ -92,10 +92,41 @@ impl Parser {
                 Ok(Expr::Group(Box::new(expr)))
             },
             TokenType::Identifier => {
-                // currently only variable
                 let sd = token.inner.as_identifier();
                 let span = token.span;
-                Ok(Expr::Variable(sd, span))
+
+                if !self.is_at_end() && self.peek().unwrap().get_type() == TokenType::LParen {
+                    self.eat_current();
+                    let mut args = vec![];
+                    loop {
+                        if self.is_at_end() {
+                            return Err(Error::parse("Unexpected end of input while parsing function call arguments.", token.span));
+                        }
+                        if self.peek().unwrap().get_type() == TokenType::RParen {
+                            self.eat_current();
+                            break;
+                        }
+                        args.push(self.expr_top_level()?);
+                        match self.peek().map(|t| t.get_type()) {
+                            Some(TokenType::Comma) => {
+                                self.eat_current();
+                            },
+                            Some(TokenType::RParen) => {
+                                // do nothing, we already checked for it
+                            },
+                            _ => {
+                                return Err(Error::parse("Expected ',' or ')' in function call arguments.", token.span));
+                            }
+                        }
+                    }
+                    Ok(Expr::FuncCall {
+                        name: sd,
+                        span,
+                        args,
+                    })
+                } else {
+                    Ok(Expr::Variable(sd, span))
+                }
             }
             _ => Err(Error::parse("Expected an expression", token.span)),
         }

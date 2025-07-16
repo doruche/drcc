@@ -27,6 +27,7 @@ use hir::{
     BlockItem,
     Stmt,
     ForInit,
+    Param,
     TypedExpr,
     Expr,
     UnaryOp,
@@ -40,6 +41,7 @@ pub use hir::{
     BlockItem as HirBlockItem,
     Stmt as HirStmt,
     ForInit as HirForInit,
+    Param as HirParam,
     TypedExpr as HirTypedExpr,
     Expr as HirExpr,
     UnaryOp as HirUnaryOp,
@@ -101,5 +103,10 @@ mod tests {
     #[test]
     fn test_control_flow() {
         test_inner("../testprogs/control_flow.c");
+    }
+
+    #[test]
+    fn test_func() {
+        test_inner("../testprogs/func.c");
     }
 }

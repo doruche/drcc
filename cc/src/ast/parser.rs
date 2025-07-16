@@ -68,6 +68,14 @@ impl Parser {
         }
     }
 
+    pub(super) fn peek_next(&self) -> Option<&Token> {
+        if self.position + 1 < self.input.len() {
+            Some(&self.input[self.position + 1])
+        } else {
+            None
+        }
+    }
+
     pub(super) fn eat(
         &mut self, 
         ttype: TokenType, 
@@ -127,5 +135,4 @@ impl Parser {
             }
         }
     }
-
 }

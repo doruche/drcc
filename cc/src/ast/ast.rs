@@ -16,8 +16,8 @@ pub enum Decl {
     FuncDecl {
         return_type: (DataType, Span),
         name: (StrDescriptor, Span),
-        // params,
-        body: Vec<BlockItem>,
+        params: Vec<Param>,
+        body: Option<Vec<BlockItem>>,
     },
     VarDecl {
         name: (StrDescriptor, Span),
@@ -25,6 +25,13 @@ pub enum Decl {
         initializer: Option<Box<Expr>>,
         // initial value,
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Param {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +49,11 @@ pub enum Expr {
         span: Span,
         left: Box<Expr>,
         right: Box<Expr>,
+    },
+    FuncCall {
+        name: StrDescriptor,
+        span: Span,
+        args: Vec<Expr>,
     },
     Ternary {
         condition: Box<Expr>,
