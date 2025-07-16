@@ -12,10 +12,11 @@ main(int argc) {
 
 int
 another(int a, int b) {
-    int foo(void);
+    int foo(void) {
+        return 0;
+    }
     {
         int foo = 3;
-        int foo(void);
     }
     return a + b;
 }

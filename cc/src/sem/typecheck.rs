@@ -8,6 +8,8 @@ use super::{
     VarSymbol,
     FuncSymbol,
     TopLevel,
+    ForInit,
+    Param,
     Decl,
     BlockItem,
     Stmt,

@@ -55,7 +55,7 @@ impl Parser {
                 };
 
                 let body = if let Some(body) = body {
-                    self.symtb.ndecl_func(
+                    self.symtb.ndef_func(
                         name.0,
                         functype,
                         Linkage::External,

@@ -52,6 +52,7 @@ pub enum SymError {
     FuncNotFound(StrDescriptor),
     LabelNotFound(StrDescriptor),
     FuncRedefinition(StrDescriptor),
+    FuncDefNotGlobal(StrDescriptor),
     TypeMismatch {
         expected: DataType,
         found: DataType,
@@ -81,6 +82,10 @@ impl SymError {
             ),
             SymError::FuncRedefinition(sd) => Error::semantic(
                 format!("Function '{}' is already defined.", strtb.get(sd).unwrap()),
+                span,
+            ),
+            SymError::FuncDefNotGlobal(sd) => Error::semantic(
+                format!("Function '{}' is defined in a non-global scope.", strtb.get(sd).unwrap()),
                 span,
             ),
             SymError::TypeMismatch { expected, found } => Error::semantic(
@@ -161,12 +166,20 @@ impl SymbolTable {
 
 // Methods used in the name resolution pass
 impl SymbolTable {
+    pub fn nat_global_scope(&self) -> bool {
+        self.common_ns.len() == 1
+    }
+
     pub fn ndef_func(
         &mut self, 
         name: StrDescriptor, 
         type_: FuncType,
         linkage: Linkage,
     ) -> Result<(), SymError> {
+        if !self.nat_global_scope() {
+            return Err(SymError::FuncDefNotGlobal(name));
+        }
+
         // currently, we ignore the linkage for function definitions
         if let Some(prev) = self.func_defs.get(&name) {
             if prev.is_definition {
@@ -184,9 +197,7 @@ impl SymbolTable {
             is_definition: true,
         };
         self.func_defs.insert(name, func_symbol.clone());
-        
-        assert!(self.common_ns.len() == 1, 
-            "Function definitions must be in the global scope");
+
         let cur_scope = self.common_ns.last_mut().unwrap();
         cur_scope.insert(name, CommonSymbol::Func(name));
         
