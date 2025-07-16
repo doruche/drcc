@@ -77,7 +77,7 @@ impl Parser {
                     self.symtb.ndecl_func(
                         name.0,
                         functype,
-                        Linkage::Internal,
+                        Linkage::External,
                     ).map_err(|e| (e, name.1))?;
                     None
                 };
@@ -271,10 +271,16 @@ impl Parser {
                 })
             }
             AstExpr::FuncCall { name, span, args } => {
-                // we won't do any type checking here, just ensure the function exists
-                // and resolve the arguments.
+                // currently we only have int type, so no need to add a type checking pass.
+                // we just check the number of arguments here, for now.
                 let () = self.symtb.nlookup_func(name)
                     .map_err(|sym_e| (sym_e, span))?;
+                let func = self.symtb.lookup_func(name)
+                    .expect("Function should be defined in the symbol table.");
+                if func.type_.param_types.len() != args.len() {
+                    return Err((SymError::InvalidArguments(name), span));
+                }
+
                 let mut r_args = vec![];
                 for arg in args {
                     let arg = self.nresolve_expr(arg)?;

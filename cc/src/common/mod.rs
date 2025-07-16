@@ -3,6 +3,8 @@ mod token;
 mod error;
 mod string_pool;
 
+use std::fmt::Display;
+
 pub use span::Span;
 pub use token::{RawToken, Token, TokenType};
 pub use error::{Error, Result};
@@ -15,6 +17,7 @@ pub enum DataType {
     Indeterminate,
 }
 
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncType {
     pub return_type: DataType,
@@ -26,4 +29,23 @@ pub struct FuncType {
 pub enum Linkage {
     Internal,
     External,
+}
+
+impl Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DataType::Int => write!(f, "int"),
+            DataType::Void => write!(f, "void"),
+            DataType::Indeterminate => write!(f, "indeterminate"),
+        }
+    }
+}
+
+impl Display for Linkage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Linkage::Internal => write!(f, "internal"),
+            Linkage::External => write!(f, "external"),
+        }
+    }
 }

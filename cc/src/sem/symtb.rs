@@ -15,10 +15,10 @@ pub struct VarSymbol {
  
 #[derive(Debug, Clone)]
 pub struct FuncSymbol {
-    pub(super) name: StrDescriptor,
-    pub(super) type_: FuncType,
-    pub(super) linkage: Linkage,
-    pub(super) is_definition: bool,
+    pub name: StrDescriptor,
+    pub type_: FuncType,
+    pub linkage: Linkage,
+    pub is_definition: bool,
 }
 
 /// In the first pass - name resolution - we only need to know
@@ -30,6 +30,12 @@ pub enum CommonSymbol {
     Func(StrDescriptor),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SymbolType {
+    Var,
+    Func,
+}
+
 impl CommonSymbol {
     pub fn name(&self) -> StrDescriptor {
         match self {
@@ -39,13 +45,12 @@ impl CommonSymbol {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LabelSymbol {
     pub(super) name: StrDescriptor,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SymError {
     DuplicateDecl(StrDescriptor),
     VarNotFound(StrDescriptor),
@@ -53,12 +58,19 @@ pub enum SymError {
     LabelNotFound(StrDescriptor),
     FuncRedefinition(StrDescriptor),
     FuncDefNotGlobal(StrDescriptor),
+    SymbolTypeMismatch {
+        name: StrDescriptor,
+        expected: SymbolType,
+        found: SymbolType,
+    },
     TypeMismatch {
         expected: DataType,
         found: DataType,
     },
     FuncTypeMismatch(StrDescriptor),
     InvalidLValue,
+    InvalidArguments(StrDescriptor),
+    Other(String),
 }
 
 impl SymError {
@@ -88,6 +100,21 @@ impl SymError {
                 format!("Function '{}' is defined in a non-global scope.", strtb.get(sd).unwrap()),
                 span,
             ),
+            SymError::SymbolTypeMismatch { name, expected, found } => {
+                let expected_str = match expected {
+                    SymbolType::Var => "variable",
+                    SymbolType::Func => "function",
+                };
+                let found_str = match found {
+                    SymbolType::Var => "variable",
+                    SymbolType::Func => "function",
+                };
+                Error::semantic(
+                    format!("Symbol '{}' is a {} but was used as a {}.", 
+                        strtb.get(name).unwrap(), found_str, expected_str),
+                    span,
+                )
+            },
             SymError::TypeMismatch { expected, found } => Error::semantic(
                 format!("Type mismatch: expected {:?}, found {:?}.", expected, found),
                 span,
@@ -100,6 +127,14 @@ impl SymError {
                 "Left-hand side of assignment must be a variable.".to_string(),
                 span,
             ),
+            SymError::InvalidArguments(name) => Error::semantic(
+                format!("Invalid arguments for function '{}'.", strtb.get(name).unwrap()),
+                span,
+            ),
+            SymError::Other(msg) => Error::semantic(
+                msg,
+                span,
+            ),
         }
     }
 }
@@ -108,7 +143,7 @@ impl SymError {
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
     common_ns: Vec<HashMap<StrDescriptor, CommonSymbol>>,
-    func_defs: HashMap<StrDescriptor, FuncSymbol>,
+    pub(super) func_defs: HashMap<StrDescriptor, FuncSymbol>,
     label_ns: HashMap<StrDescriptor, usize>,
 }
 
@@ -186,7 +221,7 @@ impl SymbolTable {
                 return Err(SymError::FuncRedefinition(name));
             }
             if prev.type_ != type_ {
-                return Err(SymError::FuncRedefinition(name));
+                return Err(SymError::FuncTypeMismatch(name));
             }
         }
 
@@ -243,8 +278,14 @@ impl SymbolTable {
         name: StrDescriptor
     ) -> Result<(), SymError> {
         for scope in self.common_ns.iter().rev() {
-            if let Some(CommonSymbol::Func(_)) = scope.get(&name) {
-                return Ok(());
+            match scope.get(&name) {
+                Some(CommonSymbol::Func(_)) => return Ok(()),
+                Some(CommonSymbol::Var(_)) => return Err(SymError::SymbolTypeMismatch { 
+                    name, 
+                    expected: SymbolType::Func, 
+                    found: SymbolType::Var 
+                }),
+                None => continue,
             }
         }
         Err(SymError::FuncNotFound(name))
@@ -270,8 +311,14 @@ impl SymbolTable {
         name: StrDescriptor
     ) -> Result<(), SymError> {
         for scope in self.common_ns.iter().rev() {
-            if let Some(CommonSymbol::Var(_)) = scope.get(&name) {
-                return Ok(());
+            match scope.get(&name) {
+                Some(CommonSymbol::Var(_)) => return Ok(()),
+                Some(CommonSymbol::Func(_)) => return Err(SymError::SymbolTypeMismatch { 
+                    name, 
+                    expected: SymbolType::Var, 
+                    found: SymbolType::Func 
+                }),
+                None => continue,
             }
         }
         Err(SymError::VarNotFound(name))
@@ -281,11 +328,14 @@ impl SymbolTable {
         &self, 
         name: StrDescriptor
     ) -> Result<(), SymError> {
-        if let Some(CommonSymbol::Var(_)) = self.common_ns.last()
-            .and_then(|scope| scope.get(&name)) {
-            Ok(())
-        } else {
-            Err(SymError::VarNotFound(name))
+        match self.common_ns.last().and_then(|scope| scope.get(&name)) {
+            Some(CommonSymbol::Var(_)) => Ok(()),
+            Some(CommonSymbol::Func(_)) => Err(SymError::SymbolTypeMismatch { 
+                name, 
+                expected: SymbolType::Var, 
+                found: SymbolType::Func 
+            }),
+            None => Err(SymError::VarNotFound(name)),
         }
     }
 }

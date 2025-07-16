@@ -46,32 +46,36 @@ impl Parser {
                     params,
                     body 
                 } => {
-                    todo!()
-                    // let mut body_insns = vec![];
-                    // let mut next_temp_id = 0;
-                    // let mut next_branch_label = 0;
-                    // for stmt in body {
-                    //     let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_branch_label)?;
-                    //     body_insns.extend(insns);
-                    // }
-                    // // C standard specifies that a function without a return statement will
-                    // // return 0 if it is the main function, otherwise:
-                    // // 1. undefined behavior, if the value is used by the caller
-                    // // 2. works fine, if the value is not used by the caller
-                    // // hence, we insert a 'ret 0' instruction to make sure the standard is followed
-                    // body_insns.push(Insn::Return(Some(Operand::Imm(0))));
+                    if let Some(body) = body {
+                        let mut body_insns = vec![];
+                        let mut next_temp_id = 0;
+                        let mut next_branch_label = 0;
+                        for stmt in body {
+                            let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_branch_label)?;
+                            body_insns.extend(insns);
+                        }
+                        // C standard specifies that a function without a return statement will
+                        // return 0 if it is the main function, otherwise:
+                        // 1. undefined behavior, if the value is used by the caller
+                        // 2. works fine, if the value is not used by the caller
+                        // hence, we insert a 'ret 0' instruction to make sure the standard is followed
+                        body_insns.push(Insn::Return(Some(Operand::Imm(0))));
 
-                    // decls.push(Function {
-                    //     name: name.0,
-                    //     return_type: return_type.0,
-                    //     body: body_insns,
-                    // });
+                        decls.push(Function {
+                            name: name.0,
+                            return_type: return_type.0,
+                            params: params.into_iter()
+                                .map(|param| param.into())
+                                .collect(),
+                            body: body_insns,
+                        });
+                    } else {}
                 },
                 HirDecl::VarDecl{..} => unimplemented!(),
             }
         }
 
-        Ok(TopLevel { functions: decls, strtb })
+        Ok(TopLevel { functions: decls, strtb, func_syms: self.hir.funcs })
     }
 }
 
@@ -82,26 +86,37 @@ pub(super) fn parse_block_item(
 ) -> Result<Vec<Insn>> {
     match item {
         HirBlockItem::Declaration(decl) => {
-            // this must be a variable declaration
-            if let HirDecl::VarDecl {
-                name, data_type, initializer,
-            } = decl {
-                // currentlt a pseudo implementation
-                let var = Operand::Var(name.0);
-                let mut insns = vec![];
-                if let Some(expr) = initializer {
-                    let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
-                    if let Some(expr_insns) = expr_insns {
-                        insns.extend(expr_insns);
+            match decl {
+                HirDecl::VarDecl { 
+                    name, 
+                    data_type, 
+                    initializer 
+                } => {
+                    let var = Operand::Var(name.0);
+                    let mut insns = vec![];
+                    if let Some(expr) = initializer {
+                        let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
+                        if let Some(expr_insns) = expr_insns {
+                            insns.extend(expr_insns);
+                        }
+                        insns.push(Insn::Move {
+                            src: src_operand,
+                            dst: var,
+                        });
                     }
-                    insns.push(Insn::Move {
-                        src: src_operand,
-                        dst: var,
-                    });
+                    Ok(insns)
+                },
+                HirDecl::FuncDecl {
+                    name,
+                    return_type,
+                    params,
+                    body,
+                } => {
+                    // this must be a function declaration, not a definition
+                    assert!(body.is_none(), "Function definitions should not be parsed here.");
+                    // actually nothing to do, since functions' name won't be mangled during semantic analysis
+                    Ok(vec![])
                 }
-                Ok(insns)
-            } else {
-                unreachable!();
             }
         },
         HirBlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_branch_label),
@@ -269,7 +284,6 @@ pub(super) fn parse_stmt(
             top_insns.push(Insn::Jump(start_label));
             top_insns.push(Insn::Label(brk_label));
         },
-        _ => unimplemented!(),
     }
     Ok(top_insns)
 }
@@ -308,7 +322,24 @@ pub(super) fn parse_expr(
             parse_expr(*inner, next_temp_id, next_branch_label)
         }
         HirExpr::FuncCall { name, span, args } => {
-            todo!()
+            let mut top_insns = vec![];
+            let mut arg_operands = vec![];
+            let dst_operand = Operand::Temp(*next_temp_id);
+            *next_temp_id += 1;
+            for arg in args {
+                let (operand, insns) = parse_expr(arg, next_temp_id, next_branch_label)?;
+                if let Some(insns) = insns {
+                    top_insns.extend(insns);
+                }
+                arg_operands.push(operand);
+            }
+            let insn = Insn::FuncCall {
+                target: name,
+                args: arg_operands,
+                dst: dst_operand,
+            };
+            top_insns.push(insn);
+            Ok((dst_operand, Some(top_insns)))
         },
         HirExpr::Binary { op: (op, span), left, right } => {
             let op = op.into();

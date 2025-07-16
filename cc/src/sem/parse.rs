@@ -60,6 +60,7 @@ impl Parser {
         Ok(TopLevel {
             decls,
             strtb,
+            funcs: self.symtb.func_defs,
         })
     }
 

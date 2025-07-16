@@ -1,5 +1,7 @@
 //! HIR representation
 
+use std::collections::HashMap;
+
 use crate::common::*;
 
 use crate::ast::AstParam;
@@ -8,6 +10,28 @@ use crate::ast::AstParam;
 pub struct TopLevel {
     pub decls: Vec<Decl>,
     pub strtb: StringPool,
+    pub funcs: HashMap<StrDescriptor, FuncSymbol>,
+}
+
+// Debug
+impl TopLevel {
+    pub fn dump_funcs(&self) -> String {
+        let mut output = String::new();
+        for (name, func) in &self.funcs {
+            output.push_str(&format!("[{}] fn {}(", func.linkage, self.strtb.get(*name).unwrap()));
+            let mut params = func.type_.param_types.iter();
+            if params.len() == 0 {
+                output.push_str("void");
+            } else {
+                output.push_str(&format!("{}", params.next().unwrap()));
+                for param in params {
+                    output.push_str(&format!(", {}", param));
+                }
+            }
+            output.push_str(&format!(") -> {}\n", func.type_.return_type));
+        }
+        output
+    }
 }
 
 #[derive(Debug)]
@@ -175,6 +199,7 @@ pub enum BinaryOp {
 }
 
 use crate::ast::{AstUnaryOp, AstBinaryOp};
+use crate::sem::FuncSymbol;
 
 impl From<AstUnaryOp> for UnaryOp {
     fn from(op: AstUnaryOp) -> Self {

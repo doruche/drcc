@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::common::*;
 use crate::sem::{
-    HirBinaryOp,
-    HirUnaryOp,
+    FuncSymbol, HirBinaryOp, HirParam, HirUnaryOp
 };
 
 
@@ -36,6 +37,21 @@ pub enum Operand {
     Imm(i64),
     Var(StrDescriptor),
     Temp(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Param {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+}
+
+impl From<HirParam> for Param {
+    fn from(param: HirParam) -> Self {
+        Param {
+            name: param.name,
+            data_type: param.data_type,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +90,11 @@ pub enum Insn {
         src: Operand,
         label: LabelOperand,
     },
+    FuncCall {
+        target: StrDescriptor,
+        args: Vec<Operand>,
+        dst: Operand,
+    },
     BranchNotZero {
         src: Operand,
         label: LabelOperand,
@@ -87,7 +108,7 @@ pub enum Insn {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: StrDescriptor,
-    // pub params,
+    pub params: Vec<Param>,
     pub return_type: DataType,
     pub body: Vec<Insn>,
 }
@@ -95,7 +116,9 @@ pub struct Function {
 #[derive(Debug)]
 pub struct TopLevel {
     pub functions: Vec<Function>,
-    // global variables,
+    // pub global_vars
+
+    pub func_syms: HashMap<StrDescriptor, FuncSymbol>,
     pub strtb: StringPool,
 }
 

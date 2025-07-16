@@ -21,9 +21,19 @@ impl TopLevel {
 
     fn emit_func(&self, func: &Function) -> String {
         let mut output = String::new();
+        let params = func.params.iter()
+            .map(|param| format!(
+                "{} {}",
+                param.data_type,
+                self.strtb.get(param.name).unwrap(),
+            ))
+            .collect::<Vec<_>>()
+            .join(", ");
         let signature = format!(
-            "fn {} (void) -> int",
+            "[{}]\nfn {} ({}) -> int",
+            self.func_syms.get(&func.name).unwrap().linkage,
             self.strtb.get(func.name).unwrap(),
+            params,
         );
         output.push_str(&signature);
         output.push('\n');
@@ -92,6 +102,19 @@ impl TopLevel {
                     BinaryOp::Assign => unreachable!(),
                 }
             },
+            Insn::FuncCall { target, args, dst } => {
+                let postfix = if args.is_empty() {
+                    "".to_string()
+                } else {
+                    let args_str = args.iter()
+                        .map(|arg| self.emit_operand(arg))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("with ({})", args_str)
+                };
+                format!("call\t{}, {} {}", 
+                    self.strtb.get(*target).unwrap(), self.emit_operand(dst), postfix)
+            }
             Insn::BranchIfZero { src, label }
                 => format!("bz\t{}, {}", self.emit_operand(src), self.emit_label_operand(label)),
             Insn::BranchNotZero { src, label }

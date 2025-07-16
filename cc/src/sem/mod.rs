@@ -18,7 +18,6 @@ mod typecheck;
 use symtb::{
     SymbolTable,
     VarSymbol,
-    FuncSymbol,
     SymError,
 };
 use hir::{
@@ -48,6 +47,7 @@ pub use hir::{
     BinaryOp as HirBinaryOp,
 };
 pub use parse::Parser as HirParser;
+pub use symtb::FuncSymbol;
 
 #[cfg(test)]
 mod tests {
@@ -65,7 +65,11 @@ mod tests {
         let result = sem_parser.parse(ast);
 
         match result {
-            Ok(hir) => println!("{:#?}", hir),
+            Ok(hir) => {
+                println!("{:#?}", hir.decls);
+                println!("String Table\n{:#?}", hir.strtb);
+                println!("Function Definitions\n{}", hir.dump_funcs());
+            },
             Err(e) => println!("{}", e),
         }        
     }
