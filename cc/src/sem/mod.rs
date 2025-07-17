@@ -3,7 +3,7 @@
 //! Bake in type information, resolved names, etc.
 //! Current passes:
 //! 1. Name resolution
-//! 2. Label resolution
+//! 2. Label resolution: attach according labels to break/continue statements
 //! 3. Type checking (not implemented yet)
 
 
@@ -30,6 +30,7 @@ use hir::{
     Expr,
     UnaryOp,
     BinaryOp,
+    Variable,
 };
 use parse::Parser;
 
@@ -40,6 +41,7 @@ pub use hir::{
     Stmt as HirStmt,
     ForInit as HirForInit,
     Param as HirParam,
+    Variable as HirVariable,
     TypedExpr as HirTypedExpr,
     Expr as HirExpr,
     UnaryOp as HirUnaryOp,
@@ -48,7 +50,8 @@ pub use hir::{
 pub use parse::Parser as HirParser;
 pub use symtb::{
     FuncSymbol,
-    StaticVarSymbol
+    StaticVarSymbol,
+    CommonVar,
 };
 
 #[cfg(test)]

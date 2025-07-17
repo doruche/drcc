@@ -24,6 +24,15 @@ pub struct Parser {
 
     pub(super) label_counter: usize,
     pub(super) loop_labels: Vec<usize>,
+    pub(super) local_var_id_counter: usize,
+}
+
+impl Parser {
+    pub(super) fn alloc_local_var(&mut self) -> usize {
+        let id = self.local_var_id_counter;
+        self.local_var_id_counter += 1;
+        id
+    }
 }
 
 impl Parser {
@@ -32,6 +41,7 @@ impl Parser {
             symtb: SymbolTable::new(),
             label_counter: 0,
             loop_labels: vec![],
+            local_var_id_counter: 0,
         }
     }
 

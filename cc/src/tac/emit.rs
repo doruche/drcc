@@ -152,9 +152,12 @@ impl TopLevel {
         match operand {
             Operand::Imm(imm) => imm.to_string(),
             Operand::Temp(tid) => format!("t.{}", tid),
-            Operand::Var(sd) => {
-                let name = self.strtb.get(*sd).unwrap();
-                format!("{}", name)
+            Operand::Var { name, local_id } => {
+                let name = self.strtb.get(*name).unwrap();
+                match local_id {
+                    Some(id) => format!("{}.{}", name, id),
+                    None => format!("{}", name),
+                }
             },
         }
     }

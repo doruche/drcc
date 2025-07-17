@@ -28,8 +28,14 @@ pub struct FuncSymbol {
 /// Whether types are matched will be determined in the type checking pass.
 #[derive(Debug, Clone)]
 pub enum CommonSymbol {
-    Var(StrDescriptor),
+    Var(CommonVar),
     Func(StrDescriptor),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CommonVar {
+    pub name: StrDescriptor,
+    pub local_id: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,7 +47,7 @@ pub enum SymbolType {
 impl CommonSymbol {
     pub fn name(&self) -> StrDescriptor {
         match self {
-            CommonSymbol::Var(name) => *name,
+            CommonSymbol::Var(var) => var.name,
             CommonSymbol::Func(name) => *name,
         }
     }
@@ -382,7 +388,7 @@ impl SymbolTable {
             self.static_vars.insert(name, static_var_symbol);
             self.common_ns.last_mut()
                 .expect("Internal error: no current scope")
-                .insert(name, CommonSymbol::Var(name));
+                .insert(name, CommonSymbol::Var(CommonVar { name, local_id: None }));
         }
 
         Ok(())
@@ -390,7 +396,8 @@ impl SymbolTable {
 
     pub fn ndef_var(
         &mut self, 
-        name: StrDescriptor, 
+        name: StrDescriptor,
+        local_id: Option<usize>,
     ) -> Result<(), SymError> {
         let cur_scope = self.common_ns.last_mut()
             .expect("Internal error: no current scope");
@@ -398,17 +405,17 @@ impl SymbolTable {
             return Err(SymError::DuplicateDecl(name));
         }
 
-        cur_scope.insert(name, CommonSymbol::Var(name));
+        cur_scope.insert(name, CommonSymbol::Var(CommonVar { name, local_id }));
         Ok(())
     }
 
     pub fn nlookup_var(
         &self, 
         name: StrDescriptor
-    ) -> Result<(), SymError> {
+    ) -> Result<CommonVar, SymError> {
         for scope in self.common_ns.iter().rev() {
             match scope.get(&name) {
-                Some(CommonSymbol::Var(_)) => return Ok(()),
+                Some(CommonSymbol::Var(var)) => return Ok(*var),
                 Some(CommonSymbol::Func(_)) => return Err(SymError::SymbolTypeMismatch { 
                     name, 
                     expected: SymbolType::Var, 

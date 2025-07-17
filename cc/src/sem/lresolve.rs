@@ -35,6 +35,7 @@ impl Parser {
                     self.label_counter = 0;
                     self.loop_labels.clear();
                     let mut r_body = vec![];
+                    self.local_var_id_counter = 0;
                     for item in body {
                         r_body.push(self.lresolve_block_item(item)?);
                     }

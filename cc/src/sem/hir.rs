@@ -67,6 +67,7 @@ pub enum Decl {
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
         linkage: Option<Linkage>,
+        local_id: Option<usize>,
         storage_class: Option<(StorageClass, Span)>,
         initializer: Option<Box<TypedExpr>>,
     }
@@ -114,10 +115,24 @@ impl TypedExpr {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Variable {
+    Local {
+        name: StrDescriptor,
+        // every function has its own local variable id counter.
+        // we use this field to distinguish local variables.
+        local_id: usize,
+    },
+    Static {
+        name: StrDescriptor,
+    },
+    Indeterminate(StrDescriptor),
+}
+
 #[derive(Debug)]
 pub enum Expr {
     IntegerLiteral(i64),
-    Variable(StrDescriptor, Span),
+    Var(Variable),
     Assignment {
         span: Span,
         left: Box<TypedExpr>,

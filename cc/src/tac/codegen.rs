@@ -9,6 +9,7 @@ use crate::sem::{
     HirForInit,
     HirTypedExpr,
     HirExpr,
+    HirVariable,
     HirUnaryOp,
     HirBinaryOp,
 };
@@ -81,6 +82,7 @@ impl Parser {
                     name, 
                     data_type, 
                     linkage,
+                    local_id,
                     storage_class, 
                     initializer 
                 } => {
@@ -124,10 +126,14 @@ pub(super) fn parse_block_item(
                     name, 
                     data_type, 
                     linkage,
+                    local_id,
                     storage_class,
                     initializer 
                 } => {
-                    let var = Operand::Var(name.0);
+                    let var = Operand::Var {
+                        name: name.0,
+                        local_id,
+                    };
                     let mut insns = vec![];
                     if let Some(expr) = initializer {
                         let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
@@ -472,11 +478,25 @@ pub(super) fn parse_expr(
                 Assign => unreachable!(),
             }
         },
-        HirExpr::Variable(name, span) => {
-            Ok((
-                Operand::Var(name),
-                None,
-            ))
+        HirExpr::Var(var) => {
+            match var {
+                HirVariable::Indeterminate(_) => 
+                    panic!("Internal error: Indeterminate variable should not be present in HIR."),
+                HirVariable::Local { name, local_id } => {
+                    let operand = Operand::Var {
+                        name,
+                        local_id: Some(local_id),
+                    };
+                    Ok((operand, None))
+                },
+                HirVariable::Static { name } => {
+                    let operand = Operand::Var {
+                        name,
+                        local_id: None,
+                    };
+                    Ok((operand, None))
+                }
+            }
         },
         HirExpr::Assignment { span, left, right } => {
             let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;

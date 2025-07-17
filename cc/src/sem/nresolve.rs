@@ -1,9 +1,9 @@
 //! The first pass of semantic analysis.
 //! Resolves names, fill in the symbol table, and builds an incomplete HirTopLevel.
 
-use crate::common::{
+use crate::{common::{
     Error, FuncType, Linkage, Span, StorageClass, StrDescriptor
-};
+}, sem::symtb::CommonVar};
 use super::{
     Parser,
     SymbolTable,
@@ -19,6 +19,7 @@ use super::{
     Expr,
     UnaryOp,
     BinaryOp,
+    Variable,
 };
 use crate::ast::{
     AstTopLevel,
@@ -50,7 +51,7 @@ impl Parser {
                         .map(|param| param.data_type)
                         .collect(),
                 };
-
+                self.local_var_id_counter = 0;
                 let body = if let Some(body) = body {
                     self.symtb.ndef_func(
                         name.0,
@@ -60,7 +61,8 @@ impl Parser {
                     self.symtb.enter_block();
 
                     for param in &params {
-                        self.symtb.ndef_var(param.name)
+                        let param_id = self.alloc_local_var();
+                        self.symtb.ndef_var(param.name, Some(param_id))
                             .map_err(|e| (e, param.span))?;
                     }
 
@@ -126,6 +128,7 @@ impl Parser {
                             name,
                             storage_class: Some(storage_class),
                             linkage: Some(linkage),
+                            local_id: None,
                             data_type,
                             initializer: r_initializer,
                         })
@@ -134,7 +137,8 @@ impl Parser {
                         if storage_class.is_some() {
                             return Err((SymError::Unimplemented("Block-scope variable storage class".into()), name.1));
                         }
-                        let () = self.symtb.ndef_var(name.0)
+                        let local_id = self.alloc_local_var();
+                        let () = self.symtb.ndef_var(name.0, Some(local_id))
                             .map_err(|e| (e, name.1))?;
                         let r_initializer = initializer
                             .map(|expr| self.nresolve_expr(*expr))
@@ -144,6 +148,7 @@ impl Parser {
                             name,
                             storage_class,
                             linkage: None,
+                            local_id: Some(local_id),
                             data_type,
                             initializer: r_initializer,
                         })
@@ -264,9 +269,13 @@ impl Parser {
         let inner = match expr {
             AstExpr::IntegerLiteral(value) => Ok(Expr::IntegerLiteral(value)),
             AstExpr::Variable(name, span) => {
-                let () = self.symtb.nlookup_var(name)
+                let var = self.symtb.nlookup_var(name)
                     .map_err(|sym_e| (sym_e, span))?;
-                Ok(Expr::Variable(name, span))
+                if let Some(local_id) = var.local_id {
+                    Ok(Expr::Var(Variable::Local { name, local_id }))
+                } else {
+                    Ok(Expr::Var(Variable::Static { name }))
+                }
             },
             AstExpr::Unary((op, span), expr) => {
                 let expr = self.nresolve_expr(*expr)?;
@@ -289,12 +298,17 @@ impl Parser {
                 // currently, only variable assignment is supported.
                 let left = *left;
                 if let AstExpr::Variable(name, span) = left {
-                    let _symbol = self.symtb.nlookup_var(name)
+                    let var = self.symtb.nlookup_var(name)
                         .map_err(|sym_e| (sym_e, span))?;
+                    let var = if let Some(local_id) = var.local_id {
+                        Variable::Local { name, local_id }
+                    } else {
+                        Variable::Static { name }
+                    };
                     let right = self.nresolve_expr(*right)?;
                     Ok(Expr::Assignment {
                         span,
-                        left: Box::new(TypedExpr::untyped(Expr::Variable(name, span))),
+                        left: Box::new(TypedExpr::untyped(Expr::Var(var))),
                         right: Box::new(right),
                     })
                 } else {

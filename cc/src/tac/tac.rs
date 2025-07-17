@@ -35,7 +35,10 @@ pub enum BinaryOp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operand {
     Imm(i64),
-    Var(StrDescriptor),
+    Var {
+        name: StrDescriptor,
+        local_id: Option<usize>,
+    },
     Temp(usize),
 }
 
@@ -129,6 +132,8 @@ pub struct TopLevel {
     pub static_vars: Vec<StaticVar>,
 
     pub strtb: StringPool,
+
+    // currently unused, for future use
     pub func_syms: HashMap<StrDescriptor, FuncSymbol>,
     pub static_var_syms: HashMap<StrDescriptor, StaticVarSymbol>,
 }
