@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::common::*;
 use crate::sem::{
     HirTopLevel,
@@ -10,6 +12,7 @@ use crate::sem::{
     HirUnaryOp,
     HirBinaryOp,
 };
+use crate::tac::tac::StaticVar;
 use super::{
     Operand,
     Insn,
@@ -34,13 +37,16 @@ impl Parser {
     }
 
     pub fn parse(mut self) -> Result<TopLevel> {
-        let mut decls = vec![];
+        let mut functions = vec![];
+        let mut static_vars: HashMap<StrDescriptor, StaticVar> = HashMap::new();
         let strtb = self.hir.strtb;
 
         // global declarations
         for decl in self.hir.decls {
             match decl {
-                HirDecl::FuncDecl { 
+                HirDecl::FuncDecl {
+                    return_type,
+                    linkage,
                     name, 
                     params,
                     body 
@@ -60,7 +66,9 @@ impl Parser {
                         // hence, we insert a 'ret 0' instruction to make sure the standard is followed
                         body_insns.push(Insn::Return(Some(Operand::Imm(0))));
 
-                        decls.push(Function {
+                        functions.push(Function {
+                            return_type,
+                            linkage,
                             name: name.0,
                             params: params.into_iter()
                                 .map(|param| param.into())
@@ -69,11 +77,38 @@ impl Parser {
                         });
                     } else {}
                 },
-                HirDecl::VarDecl{..} => unimplemented!(),
+                HirDecl::VarDecl { 
+                    name, 
+                    data_type, 
+                    linkage,
+                    storage_class, 
+                    initializer 
+                } => {
+                    let init = initializer.map(|expr| expr.to_constant());
+                    if let Some(prev) = static_vars.get_mut(&name.0) {
+                        if let Some(init) = init {
+                            prev.initializer = Some(init);
+                        }
+                    } else {
+                        static_vars.insert(name.0, StaticVar {
+                            name: name.0,
+                            data_type: data_type.0,
+                            initializer: init,
+                            linkage: linkage.unwrap(),
+                            storage_class: storage_class.unwrap().0,
+                        });
+                    }
+                },
             }
         }
 
-        Ok(TopLevel { functions: decls, strtb, func_syms: self.hir.funcs })
+        Ok(TopLevel { 
+            functions,
+            static_vars: static_vars.into_values().collect(), 
+            strtb, 
+            func_syms: self.hir.funcs,
+            static_var_syms: self.hir.static_vars,
+        })
     }
 }
 
@@ -88,25 +123,27 @@ pub(super) fn parse_block_item(
                 HirDecl::VarDecl { 
                     name, 
                     data_type, 
+                    linkage,
                     storage_class,
                     initializer 
                 } => {
-                    todo!()
-                    // let var = Operand::Var(name.0);
-                    // let mut insns = vec![];
-                    // if let Some(expr) = initializer {
-                    //     let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
-                    //     if let Some(expr_insns) = expr_insns {
-                    //         insns.extend(expr_insns);
-                    //     }
-                    //     insns.push(Insn::Move {
-                    //         src: src_operand,
-                    //         dst: var,
-                    //     });
-                    // }
-                    // Ok(insns)
+                    let var = Operand::Var(name.0);
+                    let mut insns = vec![];
+                    if let Some(expr) = initializer {
+                        let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
+                        if let Some(expr_insns) = expr_insns {
+                            insns.extend(expr_insns);
+                        }
+                        insns.push(Insn::Move {
+                            src: src_operand,
+                            dst: var,
+                        });
+                    }
+                    Ok(insns)
                 },
                 HirDecl::FuncDecl {
+                    return_type,
+                    linkage,
                     name,
                     params,
                     body,

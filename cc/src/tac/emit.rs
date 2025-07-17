@@ -11,7 +11,28 @@ use super::{
 };
 
 impl TopLevel {
-    pub fn emit(&self) -> String {
+    pub fn emit_static_vars(&self) -> String {
+        let mut output = String::new();
+        for static_var in &self.static_vars {
+            let name = self.strtb.get(static_var.name).unwrap();
+            let init = if let Some(constant) = static_var.initializer {
+                format!("= {}", constant)
+            } else {
+                String::new()
+            };
+            output.push_str(&format!(
+                "\n[{}]\n{} {} {} {}\n",
+                static_var.linkage,
+                static_var.storage_class,
+                static_var.data_type,
+                name,
+                init
+            ));
+        }
+        output
+    }
+
+    pub fn emit_code(&self) -> String {
         let mut output = String::new();
         for func in &self.functions {
             output.push_str(&self.emit_func(func));
@@ -30,10 +51,11 @@ impl TopLevel {
             .collect::<Vec<_>>()
             .join(", ");
         let signature = format!(
-            "[{}]\nfn {} ({}) -> int",
-            self.func_syms.get(&func.name).unwrap().linkage,
+            "[{}]\nfn {} ({}) -> {}",
+            func.linkage,
             self.strtb.get(func.name).unwrap(),
-            params,
+            if params.is_empty() { "void".to_string() } else { params },
+            func.return_type,
         );
         output.push_str(&signature);
         output.push('\n');

@@ -80,6 +80,8 @@ impl Parser {
                 };
                 
                 Ok(Decl::FuncDecl {
+                    return_type: return_type.0,
+                    linkage: linkage.0,
                     name,
                     params: params.into_iter()
                         .map(|param| param.into())
@@ -123,6 +125,7 @@ impl Parser {
                         Ok(Decl::VarDecl {
                             name,
                             storage_class: Some(storage_class),
+                            linkage: Some(linkage),
                             data_type,
                             initializer: r_initializer,
                         })
@@ -140,6 +143,7 @@ impl Parser {
                         Ok(Decl::VarDecl {
                             name,
                             storage_class,
+                            linkage: None,
                             data_type,
                             initializer: r_initializer,
                         })

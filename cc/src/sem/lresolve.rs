@@ -24,6 +24,8 @@ impl Parser {
         match decl {
             v@Decl::VarDecl{..} => Ok(v),
             Decl::FuncDecl {
+                return_type,
+                linkage,
                 name,
                 params,
                 body,
@@ -42,6 +44,8 @@ impl Parser {
                     None
                 };
                 Ok(Decl::FuncDecl {
+                    return_type,
+                    linkage,
                     name,
                     params: params.into_iter()
                         .map(|param| param.into())

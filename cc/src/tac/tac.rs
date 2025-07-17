@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::common::*;
 use crate::sem::{
-    FuncSymbol, HirBinaryOp, HirParam, HirUnaryOp
+    FuncSymbol, HirBinaryOp, HirParam, HirUnaryOp, StaticVarSymbol
 };
 
 
@@ -107,18 +107,30 @@ pub enum Insn {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub return_type: DataType,
+    pub linkage: Linkage,
     pub name: StrDescriptor,
     pub params: Vec<Param>,
     pub body: Vec<Insn>,
 }
 
+#[derive(Debug, Clone)]
+pub struct StaticVar {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+    pub initializer: Option<Constant>,
+    pub linkage: Linkage,
+    pub storage_class: StorageClass,
+}
+
 #[derive(Debug)]
 pub struct TopLevel {
     pub functions: Vec<Function>,
-    // pub global_vars
+    pub static_vars: Vec<StaticVar>,
 
-    pub func_syms: HashMap<StrDescriptor, FuncSymbol>,
     pub strtb: StringPool,
+    pub func_syms: HashMap<StrDescriptor, FuncSymbol>,
+    pub static_var_syms: HashMap<StrDescriptor, StaticVarSymbol>,
 }
 
 impl From<HirBinaryOp> for BinaryOp {

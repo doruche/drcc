@@ -33,6 +33,14 @@ impl TopLevel {
         }
         output
     }
+
+    pub fn dump_static_vars(&self) -> String {
+        let mut output = String::new();
+        for (name, var) in &self.static_vars {
+            output.push_str(&format!("[{}] {} {}: {}\n", var.linkage, var.storage_class, self.strtb.get(*name).unwrap(), var.type_));
+        }
+        output
+    }
 }
 
 #[derive(Debug)]
@@ -49,6 +57,8 @@ pub enum Decl {
     // so there is no need to store too much information here.
 
     FuncDecl {
+        return_type: DataType,
+        linkage: Linkage,
         name: (StrDescriptor, Span),
         params: Vec<Param>,
         body: Option<Vec<BlockItem>>,
@@ -56,6 +66,7 @@ pub enum Decl {
     VarDecl {
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
+        linkage: Option<Linkage>,
         storage_class: Option<(StorageClass, Span)>,
         initializer: Option<Box<TypedExpr>>,
     }
@@ -97,6 +108,10 @@ impl TypedExpr {
             type_: DataType::Indeterminate,
         }
     }
+
+    pub fn to_constant(self) -> Constant {
+        self.expr.to_constant()
+    }
 }
 
 #[derive(Debug)]
@@ -125,6 +140,15 @@ pub enum Expr {
         left: Box<TypedExpr>,
         right: Box<TypedExpr>,
     },
+}
+
+impl Expr {
+    pub fn to_constant(self) -> Constant {
+        match self {
+            Expr::IntegerLiteral(value) => Constant::Integer(value),
+            _ => panic!("Internal error: expected constant expression"),
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -17,7 +17,6 @@ mod typecheck;
 
 use symtb::{
     SymbolTable,
-    StaticVarSymbol,
     SymError,
 };
 use hir::{
@@ -47,7 +46,10 @@ pub use hir::{
     BinaryOp as HirBinaryOp,
 };
 pub use parse::Parser as HirParser;
-pub use symtb::FuncSymbol;
+pub use symtb::{
+    FuncSymbol,
+    StaticVarSymbol
+};
 
 #[cfg(test)]
 mod tests {
@@ -69,6 +71,7 @@ mod tests {
                 println!("{:#?}", hir.decls);
                 println!("String Table\n{:#?}", hir.strtb);
                 println!("Function Definitions\n{}", hir.dump_funcs());
+                println!("Static Variables\n{}", hir.dump_static_vars());
             },
             Err(e) => println!("{}", e),
         }        

@@ -8,7 +8,12 @@ b() {
 }
 
 static int x = 42;
-static int b();
+int x;
+int y;
+int y;
+int y = 42;
+int b();
+int b();
 
 int
 a() {

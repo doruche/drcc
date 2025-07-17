@@ -1,5 +1,5 @@
 use crate::common::{
-    DataType, Linkage, Span, StorageClass, StrDescriptor, StringPool
+    Constant, DataType, Linkage, Span, StorageClass, StrDescriptor, StringPool
 };
 
 #[derive(Debug)]

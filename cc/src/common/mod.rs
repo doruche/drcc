@@ -37,6 +37,19 @@ pub enum StorageClass {
     Extern,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Constant {
+    Integer(i64),
+}
+
+impl Display for Constant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Constant::Integer(value) => write!(f, "{}", value),
+        }
+    }
+}
+
 impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

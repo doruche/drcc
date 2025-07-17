@@ -12,6 +12,7 @@ pub use tac::{
     Operand as TacOperand,
     Insn as TacInsn,
     Function as TacFunction,
+    StaticVar as TacStaticVar,
     TopLevel as TacTopLevel,
     UnaryOp as TacUnaryOp,
     BinaryOp as TacBinaryOp,
@@ -23,6 +24,7 @@ use tac::{
     Operand,
     Insn,
     Function,
+    StaticVar,
     TopLevel,
     UnaryOp,
     BinaryOp,
@@ -85,7 +87,8 @@ mod tests {
         let result = parser.parse();
         match result {
             Ok(tac) => {
-                println!("{:#}", tac.emit());
+                println!("{:#}", tac.emit_code());
+                println!("{:#}", tac.emit_static_vars());
             }
             Err(e) => {
                 eprintln!("Error: {}", e);
@@ -131,5 +134,10 @@ mod tests {
     #[test]
     fn test_func() {
         test_inner("../testprogs/func.c");
+    }
+
+    #[test]
+    fn test_static() {
+        test_inner("../testprogs/static.c");
     }
 }
