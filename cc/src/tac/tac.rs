@@ -109,7 +109,6 @@ pub enum Insn {
 pub struct Function {
     pub name: StrDescriptor,
     pub params: Vec<Param>,
-    pub return_type: DataType,
     pub body: Vec<Insn>,
 }
 

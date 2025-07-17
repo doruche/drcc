@@ -3,14 +3,16 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use crate::{common:: {
-    DataType, Error, FuncType, Span, StrDescriptor, StringPool, Linkage,
+    DataType, Error, FuncType, Linkage, Span, StorageClass, StrDescriptor, StringPool
 }, sem::hir::Param};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct VarSymbol {
-    pub(super) name: StrDescriptor,
-    pub(super) type_: DataType,
-    pub(super) linkage: Linkage,
+pub struct StaticVarSymbol {
+    pub name: StrDescriptor,
+    pub type_: DataType,
+    pub storage_class: StorageClass,
+    pub linkage: Linkage,
+    pub is_definition: bool, 
 }
  
 #[derive(Debug, Clone)]
@@ -57,6 +59,7 @@ pub enum SymError {
     FuncNotFound(StrDescriptor),
     LabelNotFound(StrDescriptor),
     FuncRedefinition(StrDescriptor),
+    StaticVarRedefinition(StrDescriptor),
     FuncDefNotGlobal(StrDescriptor),
     SymbolTypeMismatch {
         name: StrDescriptor,
@@ -68,8 +71,11 @@ pub enum SymError {
         found: DataType,
     },
     FuncTypeMismatch(StrDescriptor),
+    LinkageMismatch(StrDescriptor),
     InvalidLValue,
+    InvalidInitializer(StrDescriptor),
     InvalidArguments(StrDescriptor),
+    Unimplemented(String),
     Other(String),
 }
 
@@ -96,8 +102,16 @@ impl SymError {
                 format!("Function '{}' is already defined.", strtb.get(sd).unwrap()),
                 span,
             ),
+            SymError::StaticVarRedefinition(sd) => Error::semantic(
+                format!("Static variable '{}' is already defined.", strtb.get(sd).unwrap()),
+                span,
+            ),
             SymError::FuncDefNotGlobal(sd) => Error::semantic(
                 format!("Function '{}' is defined in a non-global scope.", strtb.get(sd).unwrap()),
+                span,
+            ),
+            SymError::InvalidInitializer(name) => Error::semantic(
+                format!("Invalid initializer for variable '{}'.", strtb.get(name).unwrap()),
                 span,
             ),
             SymError::SymbolTypeMismatch { name, expected, found } => {
@@ -131,6 +145,14 @@ impl SymError {
                 format!("Invalid arguments for function '{}'.", strtb.get(name).unwrap()),
                 span,
             ),
+            SymError::LinkageMismatch(name) => Error::semantic(
+                format!("Static linkage declaration follows non-static for symbol '{}'.", strtb.get(name).unwrap()),
+                span,
+            ),
+            SymError::Unimplemented(msg) => Error::semantic(
+                format!("Unimplemented feature: {}", msg),
+                span,
+            ),
             SymError::Other(msg) => Error::semantic(
                 msg,
                 span,
@@ -144,6 +166,7 @@ impl SymError {
 pub struct SymbolTable {
     common_ns: Vec<HashMap<StrDescriptor, CommonSymbol>>,
     pub(super) func_defs: HashMap<StrDescriptor, FuncSymbol>,
+    pub(super) static_vars: HashMap<StrDescriptor, StaticVarSymbol>,
     label_ns: HashMap<StrDescriptor, usize>,
 }
 
@@ -154,6 +177,7 @@ impl SymbolTable {
         Self {
             common_ns: vec![HashMap::new()],
             func_defs: HashMap::new(),
+            static_vars: HashMap::new(),
             label_ns: HashMap::new(),
         }
     }
@@ -215,13 +239,21 @@ impl SymbolTable {
             return Err(SymError::FuncDefNotGlobal(name));
         }
 
-        // currently, we ignore the linkage for function definitions
+        let mut linkage = linkage;
+
         if let Some(prev) = self.func_defs.get(&name) {
             if prev.is_definition {
                 return Err(SymError::FuncRedefinition(name));
             }
             if prev.type_ != type_ {
                 return Err(SymError::FuncTypeMismatch(name));
+            }
+            linkage = match (prev.linkage, linkage) {
+                (Linkage::Internal, _) => Linkage::Internal,
+                (Linkage::External, Linkage::External) => prev.linkage,
+                (Linkage::External, Linkage::Internal) => {
+                    return Err(SymError::LinkageMismatch(name));
+                },
             }
         }
 
@@ -245,9 +277,12 @@ impl SymbolTable {
         type_: FuncType,
         linkage: Linkage,
     ) -> Result<(), SymError> {
-        if let Some(prev) = self.func_defs.get(&name) {
+        if let Some(prev) = self.func_defs.get_mut(&name) {
             if prev.type_ != type_ {
                 return Err(SymError::FuncTypeMismatch(name));
+            }
+            if let (Linkage::External, Linkage::Internal) = (prev.linkage, linkage) {
+                return Err(SymError::LinkageMismatch(name));
             }
         } else {
             let func_symbol = FuncSymbol {
@@ -291,6 +326,68 @@ impl SymbolTable {
         Err(SymError::FuncNotFound(name))
     }
 
+    pub fn ndef_static_var(
+        &mut self,
+        // nresolve module should mangle names for in-block static variables
+        // so that they do not conflict with global variables as well as each other.
+        // this is not done here, but in the nresolve module.
+        // for simplicity, only global variables and file-scope static variables
+        // are supported for now.
+        name: StrDescriptor,
+        type_: DataType,
+        storage_class: StorageClass,
+        linkage: Linkage,
+        is_definition: bool,
+    ) -> Result<(), SymError> {
+        if !self.nat_global_scope() {
+            return Err(SymError::Unimplemented(
+                "Static variables in non-global scopes are not supported yet.".to_string(),
+            ));
+        }
+
+        // since our implementation now only supports global static variables,
+        // so we can infer linkage from storage class.
+        assert!(matches!((storage_class, linkage), 
+            (StorageClass::Static, Linkage::Internal) | 
+            (StorageClass::Extern, Linkage::External)));
+
+        if let Some(prev) = self.static_vars.get_mut(&name) {
+            if prev.is_definition && is_definition {
+                return Err(SymError::StaticVarRedefinition(name));
+            }
+            if prev.type_ != type_ {
+                return Err(SymError::TypeMismatch {
+                    expected: prev.type_,
+                    found: type_,
+                });
+            }
+
+            prev.is_definition = is_definition;
+            match (prev.linkage, linkage) {
+                (Linkage::Internal, _) => assert!(prev.linkage == Linkage::Internal),
+                (Linkage::External, Linkage::External) => assert!(prev.linkage == Linkage::External),
+                (Linkage::External, Linkage::Internal) => {
+                    return Err(SymError::LinkageMismatch(name));
+                },
+            } 
+
+        } else {
+            let static_var_symbol = StaticVarSymbol {
+                name,
+                type_,
+                storage_class,
+                linkage,
+                is_definition,
+            };
+            self.static_vars.insert(name, static_var_symbol);
+            self.common_ns.last_mut()
+                .expect("Internal error: no current scope")
+                .insert(name, CommonSymbol::Var(name));
+        }
+
+        Ok(())
+    }
+
     pub fn ndef_var(
         &mut self, 
         name: StrDescriptor, 
@@ -304,7 +401,6 @@ impl SymbolTable {
         cur_scope.insert(name, CommonSymbol::Var(name));
         Ok(())
     }
-
 
     pub fn nlookup_var(
         &self, 

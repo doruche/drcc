@@ -3,7 +3,7 @@ use super::{
     Parser,
     SymbolTable,
     SymError,
-    VarSymbol,
+    StaticVarSymbol,
     FuncSymbol,
     TopLevel,
     Decl,
@@ -24,7 +24,6 @@ impl Parser {
         match decl {
             v@Decl::VarDecl{..} => Ok(v),
             Decl::FuncDecl {
-                return_type,
                 name,
                 params,
                 body,
@@ -43,7 +42,6 @@ impl Parser {
                     None
                 };
                 Ok(Decl::FuncDecl {
-                    return_type,
                     name,
                     params: params.into_iter()
                         .map(|param| param.into())

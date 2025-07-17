@@ -11,6 +11,7 @@ pub struct TopLevel {
     pub decls: Vec<Decl>,
     pub strtb: StringPool,
     pub funcs: HashMap<StrDescriptor, FuncSymbol>,
+    pub static_vars: HashMap<StrDescriptor, StaticVarSymbol>,
 }
 
 // Debug
@@ -43,8 +44,11 @@ pub enum BlockItem {
 
 #[derive(Debug)]
 pub enum Decl {
+    // when tac codegen is implemented, non-automatic symbols will be
+    // retrieved from the symbol table.
+    // so there is no need to store too much information here.
+
     FuncDecl {
-        return_type: (DataType, Span),
         name: (StrDescriptor, Span),
         params: Vec<Param>,
         body: Option<Vec<BlockItem>>,
@@ -52,6 +56,7 @@ pub enum Decl {
     VarDecl {
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
+        storage_class: Option<(StorageClass, Span)>,
         initializer: Option<Box<TypedExpr>>,
     }
 }
@@ -199,6 +204,7 @@ pub enum BinaryOp {
 }
 
 use crate::ast::{AstUnaryOp, AstBinaryOp};
+use crate::sem::symtb::StaticVarSymbol;
 use crate::sem::FuncSymbol;
 
 impl From<AstUnaryOp> for UnaryOp {

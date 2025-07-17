@@ -7,13 +7,33 @@ use super::{
 
 impl Parser {
     pub(super) fn decl(&mut self) -> Result<Decl> {
-        let type_token = self.eat_current();
-        if !type_token.is_type() {
-            return Err(Error::Parse(format!("Expected a type token, found {:?}", type_token)));
+        let mut types = vec![];
+        let mut storage_class = None;
+        while !self.is_at_end() {
+            let next_token = self.peek().unwrap();
+            if next_token.is_type() {
+                types.push(self.eat_current());
+            } else if next_token.is_specifier() {
+                if storage_class.is_none() {
+                    storage_class = Some(self.eat_current().to_storage_class());
+                } else {
+                    return Err(Error::parse("Only one storage class is allowed", next_token.span));
+                }
+            } else {
+                break;
+            }
         }
-        assert!(matches!(type_token.get_type(), TokenType::Int));
+        if types.is_empty() {
+            return Err(Error::Parse("Expected a type for declaration".into()));
+        }
+        // currentlt, only int type is supported
+        if types.len() > 1 || !matches!(types[0].get_type(), TokenType::Int) {
+            return Err(Error::Parse("Only 'int' type is supported for declaration".into()));
+        }
 
-        let id_token = self.eat(TokenType::Identifier, "Expected an identifier")?;
+        let type_token = types[0];
+
+        let name_token = self.eat(TokenType::Identifier, "Expected an identifier for declaration")?;
         if self.is_at_end() {
             return Err(Error::Parse("Unexpected end of input while parsing declaration.".into()));
         }
@@ -62,6 +82,11 @@ impl Parser {
                     }               
                 }
 
+                let linkage = (match storage_class {
+                    Some(StorageClass::Static) => Linkage::Internal,
+                    _ => Linkage::External,
+                }, type_token.span);
+
                 if self.is_at_end() {
                     return Err(Error::Parse("Unexpected end of input while parsing function body.".into()));
                 }
@@ -73,12 +98,13 @@ impl Parser {
                             body.push(self.block_item()?);
                         }
                         if self.is_at_end() {
-                            return Err(Error::parse("Unexpected end of input while parsing function body.", id_token.span));
+                            return Err(Error::parse("Unexpected end of input while parsing function body.", name_token.span));
                         }
                         self.eat(TokenType::RBrace, "Expected '}' to close function body.")?;
                         Ok(Decl::FuncDecl {
                             return_type: (DataType::Int, type_token.span),
-                            name: (id_token.inner.as_identifier(), id_token.span),
+                            linkage,
+                            name: (name_token.inner.as_identifier(), name_token.span),
                             params,
                             body: Some(body),
                         })
@@ -87,12 +113,13 @@ impl Parser {
                         self.eat_current();
                         Ok(Decl::FuncDecl {
                             return_type: (DataType::Int, type_token.span),
-                            name: (id_token.inner.as_identifier(), id_token.span),
+                            linkage,
+                            name: (name_token.inner.as_identifier(), name_token.span),
                             params,
                             body: None,
                         })
                     },
-                    _ => Err(Error::parse("Expected '{' or ';' after function declaration.", id_token.span)),
+                    _ => Err(Error::parse("Expected '{' or ';' after function declaration.", name_token.span)),
                 }
             },
             _ => {
@@ -101,7 +128,8 @@ impl Parser {
                     TokenType::Semicolon => {
                         self.eat_current();
                         Ok(Decl::VarDecl {
-                            name: (id_token.inner.as_identifier(), id_token.span),
+                            name: (name_token.inner.as_identifier(), name_token.span),
+                            storage_class: storage_class.map(|sc| (sc, type_token.span)),
                             data_type: (DataType::Int, type_token.span),
                             initializer: None,
                         })
@@ -111,12 +139,13 @@ impl Parser {
                         let initializer = self.expr_top_level()?;
                         self.eat(TokenType::Semicolon, "Expected ';' after variable declaration.")?;
                         Ok(Decl::VarDecl {
-                            name: (id_token.inner.as_identifier(), id_token.span),
+                            name: (name_token.inner.as_identifier(), name_token.span),
+                            storage_class: storage_class.map(|sc| (sc, type_token.span)),
                             data_type: (DataType::Int, type_token.span),
                             initializer: Some(Box::new(initializer)),
                         })
                     },
-                    _ => Err(Error::parse("Expected ';' after variable declaration.", id_token.span)),
+                    _ => Err(Error::parse("Expected ';' after variable declaration.", name_token.span)),
                 }
             }
         }
@@ -127,14 +156,33 @@ impl Parser {
     }
 
     pub(super) fn var_decl(&mut self) -> Result<Decl> {
-        let type_token = self.eat_current();
-        if !type_token.is_type() {
-            return Err(Error::parse("Expected a type", type_token.span));
-        }
-        assert!(matches!(type_token.get_type(), TokenType::Int));
-
-        let id_token = self.eat(TokenType::Identifier, "Expected an identifier")?;
+        let mut types = vec![];
+        let mut storage_class = None;
         
+        while !self.is_at_end() {
+            let next_token = self.peek().unwrap();
+            if next_token.is_type() {
+                types.push(self.eat_current());
+            } else if next_token.is_specifier() {
+                if storage_class.is_none() {
+                    storage_class = Some(self.eat_current().to_storage_class());
+                } else {
+                    return Err(Error::parse("Only one storage class is allowed", next_token.span));
+                }
+            } else {
+                break;
+            }
+        }
+
+        if types.is_empty() {
+            return Err(Error::Parse("Expected a type for variable declaration".into()));
+        }
+        if types.len() > 1 || !matches!(types[0].get_type(), TokenType::Int) {
+            return Err(Error::Parse("Only 'int' type is supported for variable declaration".into()));
+        }
+
+        let type_token = types[0];
+        let id_token = self.eat(TokenType::Identifier, "Expected an identifier for variable declaration")?;
         if self.is_at_end() {
             return Err(Error::Parse("Unexpected end of input while parsing variable declaration.".into()));
         }
@@ -144,6 +192,7 @@ impl Parser {
                 self.eat_current();
                 Ok(Decl::VarDecl {
                     name: (id_token.inner.as_identifier(), id_token.span),
+                    storage_class: storage_class.map(|sc| (sc, type_token.span)),
                     data_type: (DataType::Int, type_token.span),
                     initializer: None,
                 })
@@ -154,6 +203,7 @@ impl Parser {
                 self.eat(TokenType::Semicolon, "Expected ';' after variable declaration.")?;
                 Ok(Decl::VarDecl {
                     name: (id_token.inner.as_identifier(), id_token.span),
+                    storage_class: storage_class.map(|sc| (sc, type_token.span)),
                     data_type: (DataType::Int, type_token.span),
                     initializer: Some(Box::new(initializer)),
                 })

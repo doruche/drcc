@@ -2,11 +2,11 @@
 
 use std::fmt::Display;
 
-use crate::{common::{span::Span, StrDescriptor}, span};
+use crate::{common::{span::Span, StorageClass, StrDescriptor}, span};
 use crate::ast::AstBinaryOp;
 
 /// Token without any additional information.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RawToken {
     // no-lexeme tokens
     LParen, RParen,
@@ -19,6 +19,7 @@ pub enum RawToken {
     GtEq, LtEq, Or, DoubleOr, DoubleAnd, DoubleEqual,
     Return, If, Else, QuestionMark, Colon, Comma,
     While, Do, For, Break, Continue,
+    Extern, Static,
     Int, Void, 
 
 
@@ -68,6 +69,8 @@ pub enum TokenType {
     For,
     Break,
     Continue,
+    Extern,
+    Static,
     Int,
     Void,
     Integer,
@@ -76,7 +79,7 @@ pub enum TokenType {
     Nothing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token {
     pub inner: RawToken,
     pub span: Span,
@@ -125,6 +128,8 @@ impl Token {
             RawToken::For => TokenType::For,
             RawToken::Break => TokenType::Break,
             RawToken::Continue => TokenType::Continue,
+            RawToken::Extern => TokenType::Extern,
+            RawToken::Static => TokenType::Static,
             RawToken::Int => TokenType::Int,
             RawToken::Void => TokenType::Void,
             RawToken::Integer(_) => TokenType::Integer,
@@ -145,7 +150,15 @@ impl Token {
         use TokenType::*;
         matches!(self.get_type(), Int | Void)
     }
- 
+
+    pub fn is_specifier(&self) -> bool {
+        use TokenType::*;
+        self.is_type() | matches!(
+            self.get_type(),
+            Extern | Static
+        )
+    }
+
     pub fn is_binary_op(&self) -> bool {
         use TokenType::*;
         matches!(
@@ -157,6 +170,15 @@ impl Token {
             | QuestionMark
 
         )
+    }
+
+    pub fn to_storage_class(&self) -> StorageClass {
+        use TokenType::*;
+        match self.get_type() {
+            Static => StorageClass::Static,
+            Extern => StorageClass::Extern,
+            _ => panic!("Internal error: expected a storage class token, found {:?}", self),
+        }
     }
 
     pub fn to_binary_op(&self) -> AstBinaryOp {

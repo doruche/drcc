@@ -5,7 +5,7 @@ use super::{
     Parser,
     SymbolTable,
     SymError,
-    VarSymbol,
+    StaticVarSymbol,
     FuncSymbol,
     TopLevel,
     ForInit,

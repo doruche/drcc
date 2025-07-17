@@ -124,8 +124,8 @@ impl Parser {
         if self.is_at_end() {
             return Err(Error::Parse("Unexpected end of input while parsing block item.".into()));
         }
-        match self.peek().unwrap().get_type() {
-            TokenType::Int | TokenType::Void => {
+        match self.peek().unwrap() {
+            token if token.is_specifier() => {
                 let decl = self.decl()?;
                 Ok(BlockItem::Declaration(decl))
             },

@@ -2,17 +2,13 @@
 //! Resolves names, fill in the symbol table, and builds an incomplete HirTopLevel.
 
 use crate::common::{
-    StrDescriptor,
-    Span,
-    Error,
-    FuncType,
-    Linkage,
+    Error, FuncType, Linkage, Span, StorageClass, StrDescriptor
 };
 use super::{
     Parser,
     SymbolTable,
     SymError,
-    VarSymbol,
+    StaticVarSymbol,
     FuncSymbol,
     TopLevel,
     Decl,
@@ -43,6 +39,7 @@ impl Parser {
         match decl {
             AstDecl::FuncDecl {
                 return_type,
+                linkage,
                 name,
                 params,
                 body,
@@ -58,7 +55,7 @@ impl Parser {
                     self.symtb.ndef_func(
                         name.0,
                         functype,
-                        Linkage::External,
+                        linkage.0,
                     ).map_err(|e| (e, name.1))?;
                     self.symtb.enter_block();
 
@@ -77,13 +74,12 @@ impl Parser {
                     self.symtb.ndecl_func(
                         name.0,
                         functype,
-                        Linkage::External,
+                        linkage.0,
                     ).map_err(|e| (e, name.1))?;
                     None
                 };
                 
                 Ok(Decl::FuncDecl {
-                    return_type,
                     name,
                     params: params.into_iter()
                         .map(|param| param.into())
@@ -93,21 +89,62 @@ impl Parser {
             },
             AstDecl::VarDecl { 
                 name, 
+                storage_class,
                 data_type, 
                 initializer 
             } => {
-                self.symtb.ndef_var(name.0)
-                    .map_err(|e| (e, name.1))?;
-                let r_initializer = initializer
-                    .map(|expr| self.nresolve_expr(*expr))
-                    .transpose()?
-                    .map(Box::new);
-
-                Ok(Decl::VarDecl {
-                    name,
-                    data_type,
-                    initializer: r_initializer,
-                })
+                // file-scope variables and block-scope variables should be handled differently.
+                match self.symtb.nat_global_scope() {
+                    true => {
+                        if let Some(init) = &initializer {
+                            if !init.is_constant() {
+                                return Err((SymError::InvalidInitializer(name.0), name.1));   
+                            }
+                        }
+                        let storage_class = match storage_class {
+                            Some((StorageClass::Static, span)) => (StorageClass::Static, span),
+                            _ => (StorageClass::Extern, name.1),
+                        };
+                        let linkage = match storage_class {
+                            (StorageClass::Static, _) => Linkage::Internal,
+                            _ => Linkage::External,
+                        };
+                        let () = self.symtb.ndef_static_var(
+                            name.0, 
+                            data_type.0, 
+                            storage_class.0, 
+                            linkage,
+                            initializer.is_some(),
+                        ).map_err(|e| (e, name.1))?;
+                        let r_initializer = initializer
+                            .map(|expr| self.nresolve_expr(*expr))
+                            .transpose()?
+                            .map(Box::new);
+                        Ok(Decl::VarDecl {
+                            name,
+                            storage_class: Some(storage_class),
+                            data_type,
+                            initializer: r_initializer,
+                        })
+                    },
+                    false => {
+                        if storage_class.is_some() {
+                            return Err((SymError::Unimplemented("Block-scope variable storage class".into()), name.1));
+                        }
+                        let () = self.symtb.ndef_var(name.0)
+                            .map_err(|e| (e, name.1))?;
+                        let r_initializer = initializer
+                            .map(|expr| self.nresolve_expr(*expr))
+                            .transpose()?
+                            .map(Box::new);
+                        Ok(Decl::VarDecl {
+                            name,
+                            storage_class,
+                            data_type,
+                            initializer: r_initializer,
+                        })
+                    }
+                }
             }
         }
     }

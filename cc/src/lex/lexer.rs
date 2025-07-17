@@ -146,6 +146,8 @@ impl Lexer {
             "for" => Ok(Token::new(RawToken::For, span)),
             "break" => Ok(Token::new(RawToken::Break, span)),
             "continue" => Ok(Token::new(RawToken::Continue, span)),
+            "extern" => Ok(Token::new(RawToken::Extern, span)),
+            "static" => Ok(Token::new(RawToken::Static, span)),
             _ => {
                 let sd = self.strtb.intern(identifier_str.clone());
                 Ok(Token::new(RawToken::Identifier(sd), span))

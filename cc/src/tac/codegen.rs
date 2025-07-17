@@ -41,7 +41,6 @@ impl Parser {
         for decl in self.hir.decls {
             match decl {
                 HirDecl::FuncDecl { 
-                    return_type, 
                     name, 
                     params,
                     body 
@@ -63,7 +62,6 @@ impl Parser {
 
                         decls.push(Function {
                             name: name.0,
-                            return_type: return_type.0,
                             params: params.into_iter()
                                 .map(|param| param.into())
                                 .collect(),
@@ -90,25 +88,26 @@ pub(super) fn parse_block_item(
                 HirDecl::VarDecl { 
                     name, 
                     data_type, 
+                    storage_class,
                     initializer 
                 } => {
-                    let var = Operand::Var(name.0);
-                    let mut insns = vec![];
-                    if let Some(expr) = initializer {
-                        let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
-                        if let Some(expr_insns) = expr_insns {
-                            insns.extend(expr_insns);
-                        }
-                        insns.push(Insn::Move {
-                            src: src_operand,
-                            dst: var,
-                        });
-                    }
-                    Ok(insns)
+                    todo!()
+                    // let var = Operand::Var(name.0);
+                    // let mut insns = vec![];
+                    // if let Some(expr) = initializer {
+                    //     let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
+                    //     if let Some(expr_insns) = expr_insns {
+                    //         insns.extend(expr_insns);
+                    //     }
+                    //     insns.push(Insn::Move {
+                    //         src: src_operand,
+                    //         dst: var,
+                    //     });
+                    // }
+                    // Ok(insns)
                 },
                 HirDecl::FuncDecl {
                     name,
-                    return_type,
                     params,
                     body,
                 } => {

@@ -31,6 +31,12 @@ pub enum Linkage {
     External,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageClass {
+    Static,
+    Extern,
+}
+
 impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -46,6 +52,15 @@ impl Display for Linkage {
         match self {
             Linkage::Internal => write!(f, "internal"),
             Linkage::External => write!(f, "external"),
+        }
+    }
+}
+
+impl Display for StorageClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StorageClass::Static => write!(f, "static"),
+            StorageClass::Extern => write!(f, "extern"),
         }
     }
 }

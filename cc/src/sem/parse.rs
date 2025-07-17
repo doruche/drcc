@@ -14,7 +14,7 @@ use super::{
     BinaryOp,
     SymbolTable,
     SymError,
-    VarSymbol,
+    StaticVarSymbol,
     FuncSymbol,
 };
 
@@ -61,6 +61,7 @@ impl Parser {
             decls,
             strtb,
             funcs: self.symtb.func_defs,
+            static_vars: self.symtb.static_vars,
         })
     }
 

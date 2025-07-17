@@ -1,8 +1,5 @@
 use crate::common::{
-    DataType, 
-    Span, 
-    StrDescriptor, 
-    StringPool,
+    DataType, Linkage, Span, StorageClass, StrDescriptor, StringPool
 };
 
 #[derive(Debug)]
@@ -14,16 +11,17 @@ pub struct TopLevel {
 #[derive(Debug, Clone)]
 pub enum Decl {
     FuncDecl {
+        linkage: (Linkage, Span),
         return_type: (DataType, Span),
         name: (StrDescriptor, Span),
         params: Vec<Param>,
         body: Option<Vec<BlockItem>>,
     },
     VarDecl {
+        storage_class: Option<(StorageClass, Span)>, // for global variables, default to extern; for local variables, None
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
         initializer: Option<Box<Expr>>,
-        // initial value,
     }
 }
 
@@ -66,6 +64,12 @@ pub enum Expr {
         op: (BinaryOp, Span),
         left: Box<Expr>,
         right: Box<Expr>
+    }
+}
+
+impl Expr {
+    pub fn is_constant(&self) -> bool {
+        matches!(self, Expr::IntegerLiteral(_))
     }
 }
 
