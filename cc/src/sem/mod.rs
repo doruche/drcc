@@ -21,7 +21,9 @@ use symtb::{
 };
 use hir::{
     TopLevel,
-    Decl,
+    LocalVarDecl,
+    Function,
+    StaticVar,
     BlockItem,
     Stmt,
     ForInit,
@@ -36,7 +38,9 @@ use parse::Parser;
 
 pub use hir::{
     TopLevel as HirTopLevel,
-    Decl as HirDecl,
+    LocalVarDecl as HirLocalVarDecl,
+    Function as HirFunction,
+    StaticVar as HirStaticVar,
     BlockItem as HirBlockItem,
     Stmt as HirStmt,
     ForInit as HirForInit,
@@ -71,7 +75,6 @@ mod tests {
 
         match result {
             Ok(hir) => {
-                println!("{:#?}", hir.decls);
                 println!("String Table\n{:#?}", hir.strtb);
                 println!("Function Definitions\n{}", hir.dump_funcs());
                 println!("Static Variables\n{}", hir.dump_static_vars());

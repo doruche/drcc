@@ -3,21 +3,19 @@ main(void) {
     return 0;
 }
 
-int
+static int
 b() {
 }
 
 static int x = 42;
-int x;
+extern int x;
 int y;
 int y;
-int y = 42;
-int b();
+extern int z;
+
 int b();
 
 int
 a() {
     return x;
 }
-
-

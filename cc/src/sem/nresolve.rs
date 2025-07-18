@@ -2,16 +2,19 @@
 //! Resolves names, fill in the symbol table, and builds an incomplete HirTopLevel.
 
 use crate::{common::{
-    Error, FuncType, Linkage, Span, StorageClass, StrDescriptor
+    Error, FuncType, InitVal, Linkage, Span, StorageClass, StrDescriptor
 }, sem::symtb::CommonVar};
 use super::{
     Parser,
     SymbolTable,
     SymError,
     StaticVarSymbol,
+    StaticVar,
     FuncSymbol,
     TopLevel,
-    Decl,
+    Function,
+    Param,
+    LocalVarDecl,
     BlockItem,
     Stmt,
     ForInit,
@@ -36,11 +39,11 @@ impl Parser {
     pub(super) fn nresolve_decl(
         &mut self,
         decl: AstDecl,
-    ) -> Result<Decl, (SymError, Span)> {
+    ) -> Result<Option<LocalVarDecl>, (SymError, Span)> {
         match decl {
             AstDecl::FuncDecl {
                 return_type,
-                linkage,
+                storage_class,
                 name,
                 params,
                 body,
@@ -51,12 +54,11 @@ impl Parser {
                         .map(|param| param.data_type)
                         .collect(),
                 };
-                self.local_var_id_counter = 0;
                 let body = if let Some(body) = body {
                     self.symtb.ndef_func(
                         name.0,
                         functype,
-                        linkage.0,
+                        storage_class,
                     ).map_err(|e| (e, name.1))?;
                     self.symtb.enter_block();
 
@@ -66,30 +68,54 @@ impl Parser {
                             .map_err(|e| (e, param.span))?;
                     }
 
+                    self.local_var_id_counter = params.len();
                     let mut r_body = vec![];
                     for item in body {
-                        r_body.push(self.nresolve_block_item(item)?);
+                        if let Some(item) = self.nresolve_block_item(item)? {
+                            r_body.push(item);
+                        }
                     }
                     self.symtb.exit_block();
+                    self.local_var_id_counter = 0;
+
                     Some(r_body)
                 } else {
                     self.symtb.ndecl_func(
                         name.0,
                         functype,
-                        linkage.0,
+                        storage_class,
                     ).map_err(|e| (e, name.1))?;
                     None
                 };
-                
-                Ok(Decl::FuncDecl {
-                    return_type: return_type.0,
-                    linkage: linkage.0,
-                    name,
-                    params: params.into_iter()
-                        .map(|param| param.into())
-                        .collect(),
-                    body,
-                })
+
+                let params = if body.is_some() {
+                    params.into_iter().map(Param::from).collect()
+                } else {
+                    vec![]
+                };
+
+                if let Some(prev) = self.functions.get_mut(&name.0) {
+                    // in symtb.ndef_func/ndecl_func, we already checked
+                    // the return type and parameter types, as well as linkage.
+                    // so here we just update the body and params.
+                    if body.is_some() {
+                        prev.params = params;
+                        prev.body = body;
+                    }
+                } else {
+                    self.functions.insert(name.0, Function {
+                        name: name.0,
+                        params,
+                        return_type: return_type.0,
+                        linkage: match storage_class {
+                            StorageClass::Static => Linkage::Internal,
+                            _ => Linkage::External,
+                        },
+                        body,
+                    });
+                }
+
+                Ok(None)
             },
             AstDecl::VarDecl { 
                 name, 
@@ -102,39 +128,71 @@ impl Parser {
                     true => {
                         if let Some(init) = &initializer {
                             if !init.is_constant() {
-                                return Err((SymError::InvalidInitializer(name.0), name.1));   
+                                return Err((SymError::InvalidInitializer(name.0), name.1));
                             }
                         }
-                        let storage_class = match storage_class {
-                            Some((StorageClass::Static, span)) => (StorageClass::Static, span),
-                            _ => (StorageClass::Extern, name.1),
-                        };
-                        let linkage = match storage_class {
-                            (StorageClass::Static, _) => Linkage::Internal,
-                            _ => Linkage::External,
-                        };
+
                         let () = self.symtb.ndef_static_var(
                             name.0, 
                             data_type.0, 
-                            storage_class.0, 
-                            linkage,
+                            storage_class, 
                             initializer.is_some(),
                         ).map_err(|e| (e, name.1))?;
-                        let r_initializer = initializer
-                            .map(|expr| self.nresolve_expr(*expr))
-                            .transpose()?
-                            .map(Box::new);
-                        Ok(Decl::VarDecl {
-                            name,
-                            storage_class: Some(storage_class),
-                            linkage: Some(linkage),
-                            local_id: None,
-                            data_type,
-                            initializer: r_initializer,
-                        })
+
+                        let initializer = initializer
+                            .map(|expr| expr.to_constant());
+    
+                        let initializer =  if let Some(constant) = initializer {
+                            InitVal::Const(constant)
+                        } else if initializer.is_none() {
+                            if let StorageClass::Extern = storage_class {
+                                InitVal::None
+                            } else {
+                                InitVal::Tentative
+                            }
+                        } else {
+                            return Err((SymError::InvalidInitializer(name.0), name.1));
+                        };
+
+                        if let Some(prev) = self.static_vars.get_mut(&name.0) {
+                            if prev.data_type != data_type.0 {
+                                return Err((SymError::TypeMismatch {
+                                    expected: prev.data_type,
+                                    found: data_type.0,
+                                }, name.1));
+                            }
+                            match (prev.linkage, storage_class) {
+                                (Linkage::Internal, StorageClass::Unspecified) =>
+                                    return Err((SymError::LinkageMismatch(name.0), name.1)),
+                                (Linkage::External, StorageClass::Static) =>
+                                    return Err((SymError::LinkageMismatch(name.0), name.1)),
+                                _ => {}
+                            }
+                            match (prev.initializer, initializer) {
+                                (InitVal::None, init) => 
+                                    prev.initializer = init,
+                                (InitVal::Tentative, InitVal::Const(_)) => 
+                                    prev.initializer = initializer,
+                                (InitVal::Const(_), InitVal::Const(_)) =>
+                                    return Err((SymError::StaticVarRedefinition(name.0), name.1)),
+                                _ => {}
+                            }
+                        } else {
+                            self.static_vars.insert(name.0, StaticVar {
+                                name: name.0,
+                                data_type: data_type.0,
+                                linkage: match storage_class {
+                                    StorageClass::Static => Linkage::Internal,
+                                    _ => Linkage::External,
+                                },
+                                initializer,
+                            });
+                        }
+
+                        Ok(None)
                     },
                     false => {
-                        if storage_class.is_some() {
+                        if storage_class != StorageClass::Unspecified {
                             return Err((SymError::Unimplemented("Block-scope variable storage class".into()), name.1));
                         }
                         let local_id = self.alloc_local_var();
@@ -142,16 +200,13 @@ impl Parser {
                             .map_err(|e| (e, name.1))?;
                         let r_initializer = initializer
                             .map(|expr| self.nresolve_expr(*expr))
-                            .transpose()?
-                            .map(Box::new);
-                        Ok(Decl::VarDecl {
-                            name,
-                            storage_class,
-                            linkage: None,
-                            local_id: Some(local_id),
-                            data_type,
+                            .transpose()?;
+                        Ok(Some(LocalVarDecl {
+                            name: name.0,
+                            data_type: data_type.0,
+                            local_id,
                             initializer: r_initializer,
-                        })
+                        }))
                     }
                 }
             }
@@ -161,14 +216,14 @@ impl Parser {
     pub(super) fn nresolve_block_item(
         &mut self,
         item: AstBlockItem,
-    ) -> Result<BlockItem, (SymError, Span)> {
+    ) -> Result<Option<BlockItem>, (SymError, Span)> {
         match item {
             AstBlockItem::Declaration(decl) => self
                 .nresolve_decl(decl)
-                .map(BlockItem::Declaration),
+                .map(|decl| decl.map(BlockItem::Declaration)),
             AstBlockItem::Statement(stmt) => self
                 .nresolve_stmt(stmt)
-                .map(BlockItem::Statement),
+                .map(|stmt| Some(BlockItem::Statement(stmt))),
         }
     }
     
@@ -205,7 +260,9 @@ impl Parser {
                 self.symtb.enter_block();
                 let mut r_items = vec![];
                 for item in items {
-                    r_items.push(self.nresolve_block_item(item)?);
+                    if let Some(item) = self.nresolve_block_item(item)? {
+                        r_items.push(item);
+                    }
                 }
                 self.symtb.exit_block();
                 Ok(Stmt::Compound(r_items))
@@ -328,7 +385,7 @@ impl Parser {
             AstExpr::FuncCall { name, span, args } => {
                 // currently we only have int type, so no need to add a type checking pass.
                 // we just check the number of arguments here, for now.
-                let () = self.symtb.nlookup_func(name)
+                let () = self.symtb.ncheck_func(name)
                     .map_err(|sym_e| (sym_e, span))?;
                 let func = self.symtb.lookup_func(name)
                     .expect("Function should be defined in the symbol table.");
@@ -358,7 +415,10 @@ impl Parser {
         match init {
             AstForInit::Declaration(decl) => {
                 let decl = self.nresolve_decl(decl)?;
-                Ok(ForInit::Declaration(decl))
+                if decl.is_none() {
+                    panic!("Internal error: function declaration should not be passed to 'nresolve_for_init'");
+                }
+                Ok(ForInit::Declaration(decl.unwrap()))
             },
             AstForInit::Expression(expr) => {
                 let expr = self.nresolve_expr(expr)?;

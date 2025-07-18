@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::common::*;
 use crate::ast::{
     AstTopLevel,
@@ -5,8 +7,10 @@ use crate::ast::{
 };
 use super::{
     TopLevel,
-    Decl,
+    LocalVarDecl,
+    Function,
     BlockItem,
+    StaticVar,
     Stmt,
     TypedExpr,
     Expr,
@@ -25,6 +29,9 @@ pub struct Parser {
     pub(super) label_counter: usize,
     pub(super) loop_labels: Vec<usize>,
     pub(super) local_var_id_counter: usize,
+
+    pub(super) functions: HashMap<StrDescriptor, Function>,
+    pub(super) static_vars: HashMap<StrDescriptor, StaticVar>,
 }
 
 impl Parser {
@@ -42,6 +49,8 @@ impl Parser {
             label_counter: 0,
             loop_labels: vec![],
             local_var_id_counter: 0,
+            functions: HashMap::new(),
+            static_vars: HashMap::new(),
         }
     }
 
@@ -51,27 +60,25 @@ impl Parser {
     ) -> Result<TopLevel> {
         let strtb = ast.strtb;
 
-        let mut nresolve_pass_decls = vec![];
-
+        // name resolution
         for decl in ast.decls {
             match self.nresolve_decl(decl) {
-                Ok(decl) => nresolve_pass_decls.push(decl),
+                Ok(Some(_)) => panic!("Internal error: Top level parsing should not return a local variable declaration."),
+                Ok(None) => {},
                 Err((sym_e, span)) => Err(sym_e.to_error(&strtb, span))?,
             }
         }
 
-        let mut lresolve_pass_decls = vec![];
-        for decl in nresolve_pass_decls {
-            lresolve_pass_decls.push(self.lresolve_decl(decl)?);
+        // label resolution
+        let mut lresolver = super::lresolve::LResolver::new();
+        for func in self.functions.values_mut() {
+            lresolver.resolve_func(func)?;
         }
 
-        let decls = lresolve_pass_decls;
-
         Ok(TopLevel {
-            decls,
             strtb,
-            funcs: self.symtb.func_defs,
-            static_vars: self.symtb.static_vars,
+            funcs: self.functions,
+            static_vars: self.static_vars,
         })
     }
 

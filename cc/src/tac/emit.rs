@@ -1,3 +1,4 @@
+use crate::common::*;
 use std::fmt::Display;
 use super::{
     Operand,
@@ -13,20 +14,19 @@ use super::{
 impl TopLevel {
     pub fn emit_static_vars(&self) -> String {
         let mut output = String::new();
-        for static_var in &self.static_vars {
-            let name = self.strtb.get(static_var.name).unwrap();
-            let init = if let Some(constant) = static_var.initializer {
-                format!("= {}", constant)
-            } else {
-                String::new()
+        for (name, var) in &self.static_vars {
+            let name = self.strtb.get(*name).unwrap();
+            let initializer = match &var.initializer {
+                InitVal::None => "= undefined".to_string(),
+                InitVal::Const(val) => format!("= {}", val),
+                InitVal::Tentative => "= tentative".to_string(),
             };
             output.push_str(&format!(
-                "\n[{}]\n{} {} {} {}\n",
-                static_var.linkage,
-                static_var.storage_class,
-                static_var.data_type,
+                "[{}]\n{} {} {};\n",
+                var.linkage,
+                var.data_type,
                 name,
-                init
+                initializer,
             ));
         }
         output
@@ -34,7 +34,7 @@ impl TopLevel {
 
     pub fn emit_code(&self) -> String {
         let mut output = String::new();
-        for func in &self.functions {
+        for (name, func) in &self.functions {
             output.push_str(&self.emit_func(func));
         }
         output

@@ -10,7 +10,6 @@ use crate::{common:: {
 pub struct StaticVarSymbol {
     pub name: StrDescriptor,
     pub type_: DataType,
-    pub storage_class: StorageClass,
     pub linkage: Linkage,
     pub is_definition: bool, 
 }
@@ -23,7 +22,7 @@ pub struct FuncSymbol {
     pub is_definition: bool,
 }
 
-/// In the first pass - name resolution - we only need to know
+/// In name resolution - we only need to know
 /// the name of the symbol, not its type.
 /// Whether types are matched will be determined in the type checking pass.
 #[derive(Debug, Clone)]
@@ -170,10 +169,10 @@ impl SymError {
 
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
-    common_ns: Vec<HashMap<StrDescriptor, CommonSymbol>>,
+    pub(super) common_ns: Vec<HashMap<StrDescriptor, CommonSymbol>>,
+    pub(super) label_ns: HashMap<StrDescriptor, usize>,
     pub(super) func_defs: HashMap<StrDescriptor, FuncSymbol>,
     pub(super) static_vars: HashMap<StrDescriptor, StaticVarSymbol>,
-    label_ns: HashMap<StrDescriptor, usize>,
 }
 
 
@@ -182,9 +181,9 @@ impl SymbolTable {
     pub fn new() -> Self {
         Self {
             common_ns: vec![HashMap::new()],
+            label_ns: HashMap::new(),
             func_defs: HashMap::new(),
             static_vars: HashMap::new(),
-            label_ns: HashMap::new(),
         }
     }
 
@@ -239,13 +238,17 @@ impl SymbolTable {
         &mut self, 
         name: StrDescriptor, 
         type_: FuncType,
-        linkage: Linkage,
+        storage_class: StorageClass,
     ) -> Result<(), SymError> {
         if !self.nat_global_scope() {
             return Err(SymError::FuncDefNotGlobal(name));
         }
 
-        let mut linkage = linkage;
+        let mut linkage = match storage_class {
+            StorageClass::Static => Linkage::Internal,
+            StorageClass::Extern|StorageClass::Unspecified 
+                => Linkage::External,
+        };
 
         if let Some(prev) = self.func_defs.get(&name) {
             if prev.is_definition {
@@ -281,20 +284,23 @@ impl SymbolTable {
         &mut self, 
         name: StrDescriptor, 
         type_: FuncType,
-        linkage: Linkage,
+        storage_class: StorageClass,
     ) -> Result<(), SymError> {
         if let Some(prev) = self.func_defs.get_mut(&name) {
             if prev.type_ != type_ {
                 return Err(SymError::FuncTypeMismatch(name));
             }
-            if let (Linkage::External, Linkage::Internal) = (prev.linkage, linkage) {
+            if let (Linkage::External, StorageClass::Static) = (prev.linkage, storage_class) {
                 return Err(SymError::LinkageMismatch(name));
             }
         } else {
             let func_symbol = FuncSymbol {
                 name,
                 type_,
-                linkage,
+                linkage: match storage_class {
+                    StorageClass::Static => Linkage::Internal,
+                    StorageClass::Extern|StorageClass::Unspecified => Linkage::External,
+                },
                 is_definition: false,
             };
             self.func_defs.insert(name, func_symbol);
@@ -314,7 +320,7 @@ impl SymbolTable {
         Ok(())
     }
     
-    pub fn nlookup_func(
+    pub fn ncheck_func(
         &self, 
         name: StrDescriptor
     ) -> Result<(), SymError> {
@@ -342,20 +348,13 @@ impl SymbolTable {
         name: StrDescriptor,
         type_: DataType,
         storage_class: StorageClass,
-        linkage: Linkage,
         is_definition: bool,
     ) -> Result<(), SymError> {
         if !self.nat_global_scope() {
             return Err(SymError::Unimplemented(
-                "Static variables in non-global scopes are not supported yet.".to_string(),
+                "Static variables in non-global scopes.".to_string(),
             ));
         }
-
-        // since our implementation now only supports global static variables,
-        // so we can infer linkage from storage class.
-        assert!(matches!((storage_class, linkage), 
-            (StorageClass::Static, Linkage::Internal) | 
-            (StorageClass::Extern, Linkage::External)));
 
         if let Some(prev) = self.static_vars.get_mut(&name) {
             if prev.is_definition && is_definition {
@@ -369,20 +368,21 @@ impl SymbolTable {
             }
 
             prev.is_definition = is_definition;
-            match (prev.linkage, linkage) {
-                (Linkage::Internal, _) => assert!(prev.linkage == Linkage::Internal),
-                (Linkage::External, Linkage::External) => assert!(prev.linkage == Linkage::External),
-                (Linkage::External, Linkage::Internal) => {
-                    return Err(SymError::LinkageMismatch(name));
-                },
-            } 
-
+            match (prev.linkage, storage_class) {
+                (Linkage::Internal, StorageClass::Unspecified) =>
+                    return Err(SymError::LinkageMismatch(name)),
+                (Linkage::External, StorageClass::Static) => 
+                    return Err(SymError::LinkageMismatch(name)),
+                _ => {},
+            }
         } else {
             let static_var_symbol = StaticVarSymbol {
                 name,
                 type_,
-                storage_class,
-                linkage,
+                linkage: match storage_class {
+                    StorageClass::Static => Linkage::Internal,
+                    StorageClass::Extern | StorageClass::Unspecified => Linkage::External,
+                },
                 is_definition,
             };
             self.static_vars.insert(name, static_var_symbol);
@@ -427,7 +427,7 @@ impl SymbolTable {
         Err(SymError::VarNotFound(name))
     }
 
-    pub fn nlookup_var_cur(
+    pub fn ncheck_var_cur(
         &self, 
         name: StrDescriptor
     ) -> Result<(), SymError> {

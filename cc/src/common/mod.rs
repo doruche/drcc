@@ -17,6 +17,14 @@ pub enum DataType {
     Indeterminate,
 }
 
+impl DataType {
+    pub fn size(&self) -> usize {
+        match self {
+            DataType::Int => 4,
+            _ => panic!("Size not defined for this data type"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncType {
@@ -35,6 +43,14 @@ pub enum Linkage {
 pub enum StorageClass {
     Static,
     Extern,
+    Unspecified,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InitVal {
+    Const(Constant),
+    Tentative,
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +90,7 @@ impl Display for StorageClass {
         match self {
             StorageClass::Static => write!(f, "static"),
             StorageClass::Extern => write!(f, "extern"),
+            StorageClass::Unspecified => write!(f, ""),
         }
     }
 }

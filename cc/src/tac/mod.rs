@@ -16,8 +16,9 @@ pub use tac::{
     TopLevel as TacTopLevel,
     UnaryOp as TacUnaryOp,
     BinaryOp as TacBinaryOp,
-    LabelOperand as TacLabelOperand,
-    AutoGenLabel as TacAutoGenLabel,
+    Param as TacParam,
+    LabelOperand,
+    AutoGenLabel,
 };
 
 use tac::{
@@ -28,8 +29,7 @@ use tac::{
     TopLevel,
     UnaryOp,
     BinaryOp,
-    LabelOperand,
-    AutoGenLabel,
+    Param,
 };
 
 

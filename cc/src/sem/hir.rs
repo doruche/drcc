@@ -8,10 +8,9 @@ use crate::ast::AstParam;
 
 #[derive(Debug)]
 pub struct TopLevel {
-    pub decls: Vec<Decl>,
     pub strtb: StringPool,
-    pub funcs: HashMap<StrDescriptor, FuncSymbol>,
-    pub static_vars: HashMap<StrDescriptor, StaticVarSymbol>,
+    pub funcs: HashMap<StrDescriptor, Function>,
+    pub static_vars: HashMap<StrDescriptor, StaticVar>,
 }
 
 // Debug
@@ -20,16 +19,30 @@ impl TopLevel {
         let mut output = String::new();
         for (name, func) in &self.funcs {
             output.push_str(&format!("[{}] fn {}(", func.linkage, self.strtb.get(*name).unwrap()));
-            let mut params = func.type_.param_types.iter();
+            let mut params = func.params.iter();
             if params.len() == 0 {
                 output.push_str("void");
             } else {
-                output.push_str(&format!("{}", params.next().unwrap()));
+                let first = params.next().unwrap();
+                output.push_str(&format!("{} {}", 
+                    self.strtb.get(first.name).unwrap(),
+                    first.data_type,
+                ));
                 for param in params {
-                    output.push_str(&format!(", {}", param));
+                    output.push_str(&format!(", {} {}", 
+                        self.strtb.get(param.name).unwrap(),
+                        param.data_type,
+                    ));
                 }
             }
-            output.push_str(&format!(") -> {}\n", func.type_.return_type));
+            output.push_str(&format!(") -> {}", func.return_type));
+            output.push_str(&format!(" {}\n",
+                if func.body.is_some() {
+                    "{ ... }".to_string()
+                } else {
+                    "".to_string()
+                },
+            ));
         }
         output
     }
@@ -37,47 +50,57 @@ impl TopLevel {
     pub fn dump_static_vars(&self) -> String {
         let mut output = String::new();
         for (name, var) in &self.static_vars {
-            output.push_str(&format!("[{}] {} {}: {}\n", var.linkage, var.storage_class, self.strtb.get(*name).unwrap(), var.type_));
+            output.push_str(&format!("[{}] {}: {}\n",
+            var.linkage,
+            self.strtb.get(*name).unwrap(), 
+            var.data_type,
+            ));
         }
         output
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BlockItem {
-    Declaration(Decl),
+    Declaration(LocalVarDecl),
     Statement(Stmt),
 }
 
+#[derive(Debug, Clone)]
+pub struct LocalVarDecl {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+    pub local_id: usize,
+    pub initializer: Option<TypedExpr>,
+}
 
-#[derive(Debug)]
-pub enum Decl {
-    // when tac codegen is implemented, non-automatic symbols will be
-    // retrieved from the symbol table.
-    // so there is no need to store too much information here.
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: StrDescriptor,
 
-    FuncDecl {
-        return_type: DataType,
-        linkage: Linkage,
-        name: (StrDescriptor, Span),
-        params: Vec<Param>,
-        body: Option<Vec<BlockItem>>,
-    },
-    VarDecl {
-        name: (StrDescriptor, Span),
-        data_type: (DataType, Span),
-        linkage: Option<Linkage>,
-        local_id: Option<usize>,
-        storage_class: Option<(StorageClass, Span)>,
-        initializer: Option<Box<TypedExpr>>,
-    }
+    // 'params' field will be the parameters of the definition of the function if there exists one,
+    // otherwise just a blank vector.
+    // this is because we need names of parameters to generate code.
+    // but if there does not exist a definition, names do not matter.
+    pub params: Vec<Param>,
+    
+    pub return_type: DataType,
+    pub linkage: Linkage,
+    pub body: Option<Vec<BlockItem>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StaticVar {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+    pub linkage: Linkage,
+    pub initializer: InitVal,
 }
 
 #[derive(Debug, Clone)]
 pub struct Param {
     pub name: StrDescriptor,
     pub data_type: DataType,
-    pub span: Span,
 }
 
 impl Param {
@@ -91,12 +114,11 @@ impl From<AstParam> for Param {
         Self {
             name: value.name,
             data_type: value.data_type,
-            span: value.span,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypedExpr {
     pub expr: Expr,
     pub type_: DataType,
@@ -129,7 +151,7 @@ pub enum Variable {
     Indeterminate(StrDescriptor),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     IntegerLiteral(i64),
     Var(Variable),
@@ -166,7 +188,7 @@ impl Expr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Return {
         span: Span,
@@ -210,9 +232,9 @@ pub enum Stmt {
     Nil,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ForInit {
-    Declaration(Decl),
+    Declaration(LocalVarDecl),
     Expression(Box<TypedExpr>),
 }
 

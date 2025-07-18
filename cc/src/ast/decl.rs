@@ -8,14 +8,14 @@ use super::{
 impl Parser {
     pub(super) fn decl(&mut self) -> Result<Decl> {
         let mut types = vec![];
-        let mut storage_class = None;
+        let mut storage_class = StorageClass::Unspecified;
         while !self.is_at_end() {
             let next_token = self.peek().unwrap();
             if next_token.is_type() {
                 types.push(self.eat_current());
             } else if next_token.is_specifier() {
-                if storage_class.is_none() {
-                    storage_class = Some(self.eat_current().to_storage_class());
+                if let StorageClass::Unspecified = storage_class {
+                    storage_class = self.eat_current().to_storage_class();
                 } else {
                     return Err(Error::parse("Only one storage class is allowed", next_token.span));
                 }
@@ -82,11 +82,6 @@ impl Parser {
                     }               
                 }
 
-                let linkage = (match storage_class {
-                    Some(StorageClass::Static) => Linkage::Internal,
-                    _ => Linkage::External,
-                }, type_token.span);
-
                 if self.is_at_end() {
                     return Err(Error::Parse("Unexpected end of input while parsing function body.".into()));
                 }
@@ -103,7 +98,7 @@ impl Parser {
                         self.eat(TokenType::RBrace, "Expected '}' to close function body.")?;
                         Ok(Decl::FuncDecl {
                             return_type: (DataType::Int, type_token.span),
-                            linkage,
+                            storage_class,
                             name: (name_token.inner.as_identifier(), name_token.span),
                             params,
                             body: Some(body),
@@ -113,7 +108,7 @@ impl Parser {
                         self.eat_current();
                         Ok(Decl::FuncDecl {
                             return_type: (DataType::Int, type_token.span),
-                            linkage,
+                            storage_class,
                             name: (name_token.inner.as_identifier(), name_token.span),
                             params,
                             body: None,
@@ -129,7 +124,7 @@ impl Parser {
                         self.eat_current();
                         Ok(Decl::VarDecl {
                             name: (name_token.inner.as_identifier(), name_token.span),
-                            storage_class: storage_class.map(|sc| (sc, type_token.span)),
+                            storage_class,
                             data_type: (DataType::Int, type_token.span),
                             initializer: None,
                         })
@@ -140,7 +135,7 @@ impl Parser {
                         self.eat(TokenType::Semicolon, "Expected ';' after variable declaration.")?;
                         Ok(Decl::VarDecl {
                             name: (name_token.inner.as_identifier(), name_token.span),
-                            storage_class: storage_class.map(|sc| (sc, type_token.span)),
+                            storage_class,
                             data_type: (DataType::Int, type_token.span),
                             initializer: Some(Box::new(initializer)),
                         })
@@ -157,15 +152,15 @@ impl Parser {
 
     pub(super) fn var_decl(&mut self) -> Result<Decl> {
         let mut types = vec![];
-        let mut storage_class = None;
+        let mut storage_class = StorageClass::Unspecified;
         
         while !self.is_at_end() {
             let next_token = self.peek().unwrap();
             if next_token.is_type() {
                 types.push(self.eat_current());
             } else if next_token.is_specifier() {
-                if storage_class.is_none() {
-                    storage_class = Some(self.eat_current().to_storage_class());
+                if let StorageClass::Unspecified = storage_class {
+                    storage_class = self.eat_current().to_storage_class();
                 } else {
                     return Err(Error::parse("Only one storage class is allowed", next_token.span));
                 }
@@ -192,7 +187,7 @@ impl Parser {
                 self.eat_current();
                 Ok(Decl::VarDecl {
                     name: (id_token.inner.as_identifier(), id_token.span),
-                    storage_class: storage_class.map(|sc| (sc, type_token.span)),
+                    storage_class,
                     data_type: (DataType::Int, type_token.span),
                     initializer: None,
                 })
@@ -203,7 +198,7 @@ impl Parser {
                 self.eat(TokenType::Semicolon, "Expected ';' after variable declaration.")?;
                 Ok(Decl::VarDecl {
                     name: (id_token.inner.as_identifier(), id_token.span),
-                    storage_class: storage_class.map(|sc| (sc, type_token.span)),
+                    storage_class,
                     data_type: (DataType::Int, type_token.span),
                     initializer: Some(Box::new(initializer)),
                 })

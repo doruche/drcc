@@ -5,7 +5,6 @@ use crate::sem::{
     FuncSymbol, HirBinaryOp, HirParam, HirUnaryOp, StaticVarSymbol
 };
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     Pos,
@@ -121,21 +120,15 @@ pub struct Function {
 pub struct StaticVar {
     pub name: StrDescriptor,
     pub data_type: DataType,
-    pub initializer: Option<Constant>,
+    pub initializer: InitVal,
     pub linkage: Linkage,
-    pub storage_class: StorageClass,
 }
 
 #[derive(Debug)]
 pub struct TopLevel {
-    pub functions: Vec<Function>,
-    pub static_vars: Vec<StaticVar>,
-
+    pub functions: HashMap<StrDescriptor, Function>,
+    pub static_vars: HashMap<StrDescriptor, StaticVar>,
     pub strtb: StringPool,
-
-    // currently unused, for future use
-    pub func_syms: HashMap<StrDescriptor, FuncSymbol>,
-    pub static_var_syms: HashMap<StrDescriptor, StaticVarSymbol>,
 }
 
 impl From<HirBinaryOp> for BinaryOp {

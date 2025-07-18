@@ -11,14 +11,14 @@ pub struct TopLevel {
 #[derive(Debug, Clone)]
 pub enum Decl {
     FuncDecl {
-        linkage: (Linkage, Span),
         return_type: (DataType, Span),
+        storage_class: StorageClass,
         name: (StrDescriptor, Span),
         params: Vec<Param>,
         body: Option<Vec<BlockItem>>,
     },
     VarDecl {
-        storage_class: Option<(StorageClass, Span)>, // for global variables, default to extern; for local variables, None
+        storage_class: StorageClass,
         name: (StrDescriptor, Span),
         data_type: (DataType, Span),
         initializer: Option<Box<Expr>>,
@@ -70,6 +70,13 @@ pub enum Expr {
 impl Expr {
     pub fn is_constant(&self) -> bool {
         matches!(self, Expr::IntegerLiteral(_))
+    }
+
+    pub fn to_constant(self) -> Constant {
+        match self {
+            Expr::IntegerLiteral(value) => Constant::Integer(value),
+            _ => panic!("Internal error: expected constant expression"),
+        }
     }
 }
 

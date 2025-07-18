@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use crate::common::*;
 use crate::sem::{
     HirTopLevel,
-    HirDecl,
+    HirFunction,
+    HirLocalVarDecl,
+    HirParam,
+    HirStaticVar,
     HirBlockItem,
     HirStmt,
     HirForInit,
@@ -13,10 +16,11 @@ use crate::sem::{
     HirUnaryOp,
     HirBinaryOp,
 };
-use crate::tac::tac::StaticVar;
 use super::{
     Operand,
     Insn,
+    StaticVar,
+    Param,
     Function,
     TopLevel,
     UnaryOp,
@@ -38,78 +42,61 @@ impl Parser {
     }
 
     pub fn parse(mut self) -> Result<TopLevel> {
-        let mut functions = vec![];
-        let mut static_vars: HashMap<StrDescriptor, StaticVar> = HashMap::new();
+        let mut functions = HashMap::new();
+        let mut static_vars = HashMap::new();
         let strtb = self.hir.strtb;
 
-        // global declarations
-        for decl in self.hir.decls {
-            match decl {
-                HirDecl::FuncDecl {
-                    return_type,
-                    linkage,
-                    name, 
-                    params,
-                    body 
-                } => {
-                    if let Some(body) = body {
-                        let mut body_insns = vec![];
-                        let mut next_temp_id = 0;
-                        let mut next_branch_label = 0;
-                        for stmt in body {
-                            let insns = parse_block_item(stmt, &mut next_temp_id, &mut next_branch_label)?;
-                            body_insns.extend(insns);
-                        }
-                        // C standard specifies that a function without a return statement will
-                        // return 0 if it is the main function, otherwise:
-                        // 1. undefined behavior, if the value is used by the caller
-                        // 2. works fine, if the value is not used by the caller
-                        // hence, we insert a 'ret 0' instruction to make sure the standard is followed
-                        body_insns.push(Insn::Return(Some(Operand::Imm(0))));
-
-                        functions.push(Function {
-                            return_type,
-                            linkage,
-                            name: name.0,
-                            params: params.into_iter()
-                                .map(|param| param.into())
-                                .collect(),
-                            body: body_insns,
-                        });
-                    } else {}
-                },
-                HirDecl::VarDecl { 
-                    name, 
-                    data_type, 
-                    linkage,
-                    local_id,
-                    storage_class, 
-                    initializer 
-                } => {
-                    let init = initializer.map(|expr| expr.to_constant());
-                    if let Some(prev) = static_vars.get_mut(&name.0) {
-                        if let Some(init) = init {
-                            prev.initializer = Some(init);
-                        }
-                    } else {
-                        static_vars.insert(name.0, StaticVar {
-                            name: name.0,
-                            data_type: data_type.0,
-                            initializer: init,
-                            linkage: linkage.unwrap(),
-                            storage_class: storage_class.unwrap().0,
-                        });
-                    }
-                },
-            }
+        // static variables
+        for (name, var) in self.hir.static_vars {    
+            static_vars.insert(name, StaticVar {
+                name,
+                data_type: var.data_type,
+                initializer: var.initializer,
+                linkage: var.linkage,
+            });
         }
 
-        Ok(TopLevel { 
+        // global declarations
+        for (name, function) in self.hir.funcs {
+            if function.body.is_none() {
+                continue;
+            }
+
+            let linkage = function.linkage;
+            let params = function.params
+                .into_iter()
+                .map(Param::from)
+                .collect::<Vec<_>>();
+            let return_type = function.return_type;
+
+            let mut func_insns = vec![];
+            let next_temp_id = &mut 0;
+            let next_branch_label = &mut 0;
+            for item in function.body.unwrap() {
+                let insn = parse_block_item(item, next_temp_id, next_branch_label)?;
+                func_insns.extend(insn);
+            }
+
+            // C standard specifies that a function without a return statement will
+            // return 0 if it is the main function, otherwise:
+            // 1. undefined behavior, if the value is used by the caller
+            // 2. works fine, if the value is not used by the caller
+            // hence, we insert a 'ret 0' instruction to make sure the standard is followed
+            func_insns.push(Insn::Return(Some(Operand::Imm(0))));
+
+            functions.insert(name, Function {
+                return_type,
+                linkage,
+                name,
+                params,
+                body: func_insns,
+            });
+        }
+
+        Ok(TopLevel {
             functions,
-            static_vars: static_vars.into_values().collect(), 
-            strtb, 
-            func_syms: self.hir.funcs,
-            static_var_syms: self.hir.static_vars,
+            static_vars,
+            strtb,
         })
     }
 }
@@ -120,46 +107,31 @@ pub(super) fn parse_block_item(
     next_branch_label: &mut usize,
 ) -> Result<Vec<Insn>> {
     match item {
-        HirBlockItem::Declaration(decl) => {
-            match decl {
-                HirDecl::VarDecl { 
-                    name, 
-                    data_type, 
-                    linkage,
-                    local_id,
-                    storage_class,
-                    initializer 
-                } => {
-                    let var = Operand::Var {
-                        name: name.0,
-                        local_id,
-                    };
-                    let mut insns = vec![];
-                    if let Some(expr) = initializer {
-                        let (src_operand, expr_insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
-                        if let Some(expr_insns) = expr_insns {
-                            insns.extend(expr_insns);
-                        }
-                        insns.push(Insn::Move {
-                            src: src_operand,
-                            dst: var,
-                        });
-                    }
-                    Ok(insns)
-                },
-                HirDecl::FuncDecl {
-                    return_type,
-                    linkage,
-                    name,
-                    params,
-                    body,
-                } => {
-                    // this must be a function declaration, not a definition
-                    assert!(body.is_none(), "Function definitions should not be parsed here.");
-                    // actually nothing to do, since functions' name won't be mangled during semantic analysis
-                    Ok(vec![])
+        HirBlockItem::Declaration(local_var_decl) => {
+            let HirLocalVarDecl {
+                name,
+                data_type,
+                local_id,
+                initializer,
+            } = local_var_decl;
+
+            let var = Operand::Var {
+                name,
+                local_id: Some(local_id),
+            };
+            
+            let mut insns = vec![];
+            if let Some(expr) = initializer {
+                let (src_operand, expr_insns) = parse_expr(expr, next_temp_id, next_branch_label)?;
+                if let Some(expr_insns) = expr_insns {
+                    insns.extend(expr_insns);
                 }
+                insns.push(Insn::Move {
+                    src: src_operand,
+                    dst: var,
+                });
             }
+            Ok(insns)
         },
         HirBlockItem::Statement(stmt) => parse_stmt(stmt, next_temp_id, next_branch_label),
     }

@@ -10,7 +10,7 @@ use super::{
     TopLevel,
     ForInit,
     Param,
-    Decl,
+    LocalVarDecl,
     BlockItem,
     Stmt,
     TypedExpr,
@@ -19,32 +19,10 @@ use super::{
     BinaryOp,
 };
 
-impl Parser {
-    pub(super) fn type_decl(
-        &mut self,
-        decl: Decl,
-    ) -> Result<Decl> {
-        todo!()
-    }
+pub struct TypeChecker {
 
-    pub(super) fn type_block_item(
-        &mut self,
-        item: BlockItem,
-    ) -> Result<BlockItem> {
-        todo!()
-    }
+}
 
-    pub(super) fn type_stmt(
-        &mut self,
-        stmt: Stmt,
-    ) -> Result<Stmt> {
-        todo!()
-    }
+impl TypeChecker {
 
-    pub(super) fn type_expr(
-        &mut self,
-        expr: Expr,
-    ) -> Result<TypedExpr> {
-        todo!()
-    }
 }
