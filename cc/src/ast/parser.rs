@@ -1,4 +1,4 @@
-use crate::common::*;
+use crate::{common::*, span};
 use super::{
     TopLevel,
     Decl,
@@ -26,6 +26,11 @@ impl Parser {
             has_error: false,
             strtb,
         }
+    }
+
+    pub fn cur_span(&self) -> Span {
+        self.input.get(self.position - 1)
+            .map_or(span!(), |t| t.span)
     }
 
     pub fn strtb(self) -> StringPool {
@@ -60,11 +65,11 @@ impl Parser {
         self.position >= self.input.len()
     }
 
-    pub(super) fn peek(&self) -> Option<&Token> {
+    pub(super) fn peek(&self) -> Result<&Token> {
         if self.is_at_end() {
-            None
+            Err(Error::parse("Unexpected end of input while peeking token.", self.cur_span()))
         } else {
-            Some(&self.input[self.position])
+            Ok(&self.input[self.position])
         }
     }
 
@@ -90,7 +95,7 @@ impl Parser {
                 return Ok(token.take());
             }
         }
-        Err(Error::Parse(fail_msg.to_string()))
+        Err(Error::parse(fail_msg, self.cur_span()))
     }
 
     pub(super) fn eat_current(&mut self) -> Token {
@@ -110,7 +115,7 @@ impl Parser {
             if token.get_type() == RBrace {
                 break;
             }
-            if let Some(next_token) = self.peek() {
+            if let Ok(next_token) = self.peek() {
                 if next_token.get_type() == LBrace {
                     break;
                 }
@@ -134,5 +139,21 @@ impl Parser {
                 Ok(BlockItem::Statement(stmt))
             }
         }
+    }
+}
+
+pub(super) fn parse_types(types: Vec<DataType>, span: Span) -> Result<DataType> {
+    match types.len() {
+        0 => Err(Error::parse("Expected a type for declaration", span)),
+        1 => Ok(types[0]),
+        2 => {
+            let (first, second) = (types[0], types[1]);
+            match (first, second) {
+                (DataType::Int, DataType::Long) => Ok(DataType::Long),
+                (DataType::Long, DataType::Int) => Ok(DataType::Long),
+                _ => Err(Error::parse("Unsupported type combination for declaration", span)),
+            }
+        },
+        _ => Err(Error::parse("Too many types specified for declaration", span)),
     }
 }

@@ -49,7 +49,7 @@ impl Parser {
                 body,
             } => {
                 let functype = FuncType {
-                    return_type: return_type.0,
+                    return_type,
                     param_types: params.iter()
                         .map(|param| param.data_type)
                         .collect(),
@@ -64,7 +64,7 @@ impl Parser {
 
                     for param in &params {
                         let param_id = self.alloc_local_var();
-                        self.symtb.ndef_var(param.name, Some(param_id))
+                        self.symtb.ndef_var(param.name, param.data_type, Some(param_id))
                             .map_err(|e| (e, param.span))?;
                     }
 
@@ -106,7 +106,7 @@ impl Parser {
                     self.functions.insert(name.0, Function {
                         name: name.0,
                         params,
-                        return_type: return_type.0,
+                        return_type,
                         linkage: match storage_class {
                             StorageClass::Static => Linkage::Internal,
                             _ => Linkage::External,
@@ -120,6 +120,7 @@ impl Parser {
             AstDecl::VarDecl { 
                 name, 
                 storage_class,
+                span,
                 data_type, 
                 initializer 
             } => {
@@ -134,7 +135,7 @@ impl Parser {
 
                         let () = self.symtb.ndef_static_var(
                             name.0, 
-                            data_type.0, 
+                            data_type, 
                             storage_class, 
                             initializer.is_some(),
                         ).map_err(|e| (e, name.1))?;
@@ -155,10 +156,10 @@ impl Parser {
                         };
 
                         if let Some(prev) = self.static_vars.get_mut(&name.0) {
-                            if prev.data_type != data_type.0 {
+                            if prev.data_type != data_type {
                                 return Err((SymError::TypeMismatch {
                                     expected: prev.data_type,
-                                    found: data_type.0,
+                                    found: data_type,
                                 }, name.1));
                             }
                             match (prev.linkage, storage_class) {
@@ -180,7 +181,7 @@ impl Parser {
                         } else {
                             self.static_vars.insert(name.0, StaticVar {
                                 name: name.0,
-                                data_type: data_type.0,
+                                data_type: data_type,
                                 linkage: match storage_class {
                                     StorageClass::Static => Linkage::Internal,
                                     _ => Linkage::External,
@@ -196,14 +197,15 @@ impl Parser {
                             return Err((SymError::Unimplemented("Block-scope variable storage class".into()), name.1));
                         }
                         let local_id = self.alloc_local_var();
-                        let () = self.symtb.ndef_var(name.0, Some(local_id))
+                        let () = self.symtb.ndef_var(name.0, data_type, Some(local_id))
                             .map_err(|e| (e, name.1))?;
                         let r_initializer = initializer
                             .map(|expr| self.nresolve_expr(*expr))
                             .transpose()?;
                         Ok(Some(LocalVarDecl {
                             name: name.0,
-                            data_type: data_type.0,
+                            data_type,
+                            span,
                             local_id,
                             initializer: r_initializer,
                         }))
@@ -329,9 +331,9 @@ impl Parser {
                 let var = self.symtb.nlookup_var(name)
                     .map_err(|sym_e| (sym_e, span))?;
                 if let Some(local_id) = var.local_id {
-                    Ok(Expr::Var(Variable::Local { name, local_id }))
+                    Ok(Expr::Var(Variable::Local { name, local_id, data_type: var.data_type }))
                 } else {
-                    Ok(Expr::Var(Variable::Static { name }))
+                    Ok(Expr::Var(Variable::Static { name, data_type: var.data_type }))
                 }
             },
             AstExpr::Unary((op, span), expr) => {
@@ -358,9 +360,9 @@ impl Parser {
                     let var = self.symtb.nlookup_var(name)
                         .map_err(|sym_e| (sym_e, span))?;
                     let var = if let Some(local_id) = var.local_id {
-                        Variable::Local { name, local_id }
+                        Variable::Local { name, local_id, data_type: var.data_type }
                     } else {
-                        Variable::Static { name }
+                        Variable::Static { name, data_type: var.data_type }
                     };
                     let right = self.nresolve_expr(*right)?;
                     Ok(Expr::Assignment {
@@ -372,26 +374,20 @@ impl Parser {
                     Err((SymError::InvalidLValue, span))
                 }
             },
-            AstExpr::Ternary { condition, then_expr, else_expr } => {
+            AstExpr::Ternary { condition, then_expr, else_expr, span } => {
                 let condition = self.nresolve_expr(*condition)?;
                 let then_expr = self.nresolve_expr(*then_expr)?;
                 let else_expr = self.nresolve_expr(*else_expr)?;
                 Ok(Expr::Ternary {
+                    span,
                     condition: Box::new(condition),
                     then_expr: Box::new(then_expr),
                     else_expr: Box::new(else_expr),
                 })
             }
             AstExpr::FuncCall { name, span, args } => {
-                // currently we only have int type, so no need to add a type checking pass.
-                // we just check the number of arguments here, for now.
                 let () = self.symtb.ncheck_func(name)
                     .map_err(|sym_e| (sym_e, span))?;
-                let func = self.symtb.lookup_func(name)
-                    .expect("Function should be defined in the symbol table.");
-                if func.type_.param_types.len() != args.len() {
-                    return Err((SymError::InvalidArguments(name), span));
-                }
 
                 let mut r_args = vec![];
                 for arg in args {
@@ -404,6 +400,15 @@ impl Parser {
                     args: r_args,
                 })
             },
+            AstExpr::Cast { target, expr, span } => {
+                // We'll check whether the cast is valid in the type checking pass.
+                let expr = self.nresolve_expr(*expr)?;
+                Ok(Expr::Cast {
+                    target,
+                    expr: Box::new(expr),
+                    span,
+                })
+            }
         };
         Ok(TypedExpr::untyped(inner?))
     }

@@ -117,15 +117,29 @@ impl Lexer {
     */
 
     fn integer(&mut self) -> Result<Token> {
-        let (span, start_position) = self.advance_while(|c| c.is_digit(10));        
+        let (mut span, start_position) = self.advance_while(|c| c.is_digit(10));        
         
         let integer_str: String = self.input[start_position..self.position].iter().collect();
-        let integer_val = integer_str.parse::<i64>()
-            .map_err(|e| Error::Lex(format!("Invalid integer: {e:?}")))?;
-        
-        let raw = RawToken::Integer(integer_val);
-
-        Ok(Token::new(raw, span))
+        match self.input[self.position] {
+            'l'|'L' => {
+                self.advance();
+                let long_value = integer_str.parse::<i64>()
+                    .map_err(|e| Error::Lex(format!("Invalid long integer: {e:?}")))?;
+                let raw = RawToken::LongLiteral(long_value);
+                span.length = Some(span.length.unwrap_or(0) + 1);
+                Ok(Token::new(raw, span))
+            },
+            _ => {
+                let int_value = integer_str.parse::<i64>()
+                    .map_err(|e| Error::Lex(format!("Invalid integer: {e:?}")))?;
+                if int_value <= i32::MAX as i64 {
+                    let raw = RawToken::IntLiteral(int_value as i32);
+                    Ok(Token::new(raw, span))
+                } else {
+                    Ok(Token::new(RawToken::LongLiteral(int_value), span))
+                }
+            }
+        }
     }
 
     fn identifier(&mut self) -> Result<Token> {
@@ -138,6 +152,7 @@ impl Lexer {
         match identifier_str.as_str() {
             "return" => Ok(Token::new(RawToken::Return, span)),
             "int" => Ok(Token::new(RawToken::Int, span)),
+            "long" => Ok(Token::new(RawToken::Long, span)),
             "void" => Ok(Token::new(RawToken::Void, span)),
             "if" => Ok(Token::new(RawToken::If, span)),
             "else" => Ok(Token::new(RawToken::Else, span)),

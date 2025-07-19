@@ -116,4 +116,9 @@ mod tests {
     fn test_static() {
         test_inner("../testprogs/static.c");
     }
+
+    #[test]
+    fn test_long() {
+        test_inner("../testprogs/long.c");
+    }
 }

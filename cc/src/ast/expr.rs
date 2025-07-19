@@ -1,4 +1,4 @@
-use crate::common::*;
+use crate::{ast::parser::parse_types, common::*};
 use super::{
     Parser,
     TopLevel,
@@ -21,7 +21,7 @@ impl Parser {
         let mut right;
         loop {
             let next_op_token = self.peek();
-            if next_op_token.is_none() || !next_op_token.unwrap().is_binary_op() {
+            if next_op_token.is_err() || !next_op_token.as_ref().unwrap().is_binary_op() {
                 break;
             }
             if next_op_token.unwrap().to_binary_op().precedence() < min_prec {
@@ -43,6 +43,7 @@ impl Parser {
                 self.eat(TokenType::Colon, "Expected ':' in ternary expression.")?;
                 right = self.expr(BinaryOp::Ternary.precedence())?;
                 left = Expr::Ternary {
+                    span: next_op_token.span,
                     condition: Box::new(left),
                     then_expr: Box::new(middle),
                     else_expr: Box::new(right),
@@ -61,10 +62,7 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Result<Expr> {
-        if self.is_at_end() {
-            return Err(Error::Parse("Unexpected end of input while parsing expression.".into()));
-        }
-        if matches!(self.peek().unwrap().get_type(),
+        if matches!(self.peek()?.get_type(),
         TokenType::Hyphen|TokenType::Plus|TokenType::Tilde) {
             let op_token = self.eat_current();
             let op = match op_token.get_type() {
@@ -85,38 +83,58 @@ impl Parser {
     fn primary(&mut self) -> Result<Expr> {
         let token = self.eat_current();
         match token.get_type() {
-            TokenType::Integer => Ok(Expr::IntegerLiteral(token.inner.as_integer())),
+            TokenType::IntLiteral|TokenType::LongLiteral => {
+                let constant = token.inner.as_constant();
+                Ok(Expr::IntegerLiteral(constant))
+            },
             TokenType::LParen => {
-                let expr = self.parse_expr()?;
-                self.eat(TokenType::RParen, "Expected ')' to close expression.")?;
-                Ok(Expr::Group(Box::new(expr)))
+                if self.peek()?.is_type() {
+                    let mut types = vec![];
+                    loop {
+                        if self.peek()?.is_type() {
+                            types.push(self.eat_current().inner.as_type());
+                        } else if self.peek()?.get_type() == TokenType::RParen {
+                            self.eat_current();
+                            break;
+                        } else {
+                            Err(Error::parse("Expected a type or ')'", self.cur_span()))?;
+                        }
+                    }
+                    let target = parse_types(types, self.cur_span())?;
+                    let expr = Box::new(self.expr_top_level()?);
+                    Ok(Expr::Cast {
+                        target,
+                        expr,
+                        span: token.span,
+                    })
+                } else {
+                    // grouping
+                    let expr = self.primary()?;
+                    self.eat(TokenType::RParen, "Expected ')' to close expression.")?;
+                    Ok(Expr::Group(Box::new(expr)))
+                }
             },
             TokenType::Identifier => {
                 let sd = token.inner.as_identifier();
                 let span = token.span;
 
-                if !self.is_at_end() && self.peek().unwrap().get_type() == TokenType::LParen {
+                if let Ok(TokenType::LParen) = self.peek().map(Token::get_type) {
                     self.eat_current();
                     let mut args = vec![];
                     loop {
-                        if self.is_at_end() {
-                            return Err(Error::parse("Unexpected end of input while parsing function call arguments.", token.span));
-                        }
-                        if self.peek().unwrap().get_type() == TokenType::RParen {
+                        if self.peek()?.get_type() == TokenType::RParen {
                             self.eat_current();
                             break;
                         }
                         args.push(self.expr_top_level()?);
-                        match self.peek().map(|t| t.get_type()) {
-                            Some(TokenType::Comma) => {
+                        match self.peek()?.get_type() {
+                            TokenType::Comma => {
                                 self.eat_current();
                             },
-                            Some(TokenType::RParen) => {
+                            TokenType::RParen => {
                                 // do nothing, we already checked for it
                             },
-                            _ => {
-                                return Err(Error::parse("Expected ',' or ')' in function call arguments.", token.span));
-                            }
+                            _ => Err(Error::parse("Expected ',' or ')' in function call arguments.", span))?
                         }
                     }
                     Ok(Expr::FuncCall {

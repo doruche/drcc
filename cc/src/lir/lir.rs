@@ -2,7 +2,7 @@ use crate::{asm::Register, common::*, tac::LabelOperand};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operand {
-    PseudoReg(usize),
+    VirtReg(usize),
     PhysReg(Register),
     Imm(i64),
     StackSlot(i32), // relative to fp/s8

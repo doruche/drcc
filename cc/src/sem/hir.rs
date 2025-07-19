@@ -71,6 +71,7 @@ pub struct LocalVarDecl {
     pub name: StrDescriptor,
     pub data_type: DataType,
     pub local_id: usize,
+    pub span: Span,
     pub initializer: Option<TypedExpr>,
 }
 
@@ -120,20 +121,16 @@ impl From<AstParam> for Param {
 
 #[derive(Debug, Clone)]
 pub struct TypedExpr {
-    pub expr: Expr,
+    pub untyped: Expr,
     pub type_: DataType,
 }
 
 impl TypedExpr {
     pub fn untyped(expr: Expr) -> Self {
         Self {
-            expr,
+            untyped: expr,
             type_: DataType::Indeterminate,
         }
-    }
-
-    pub fn to_constant(self) -> Constant {
-        self.expr.to_constant()
     }
 }
 
@@ -144,16 +141,26 @@ pub enum Variable {
         // every function has its own local variable id counter.
         // we use this field to distinguish local variables.
         local_id: usize,
+        data_type: DataType,
     },
     Static {
         name: StrDescriptor,
+        data_type: DataType,
     },
-    Indeterminate(StrDescriptor),
+}
+
+impl Variable {
+    pub fn data_type(&self) -> DataType {
+        match self {
+            Variable::Local { data_type, .. } => *data_type,
+            Variable::Static { data_type, .. } => *data_type,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    IntegerLiteral(i64),
+    IntegerLiteral(Constant),
     Var(Variable),
     Assignment {
         span: Span,
@@ -166,6 +173,7 @@ pub enum Expr {
         args: Vec<TypedExpr>,
     },
     Ternary {
+        span: Span,
         condition: Box<TypedExpr>,
         then_expr: Box<TypedExpr>,
         else_expr: Box<TypedExpr>,
@@ -177,16 +185,13 @@ pub enum Expr {
         left: Box<TypedExpr>,
         right: Box<TypedExpr>,
     },
-}
-
-impl Expr {
-    pub fn to_constant(self) -> Constant {
-        match self {
-            Expr::IntegerLiteral(value) => Constant::Integer(value),
-            _ => panic!("Internal error: expected constant expression"),
-        }
+    Cast {
+        target: DataType,
+        expr: Box<TypedExpr>,
+        span: Span,
     }
 }
+
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
@@ -299,5 +304,11 @@ impl From<AstBinaryOp> for BinaryOp {
             AstBinaryOp::Assign|
             AstBinaryOp::Ternary => unreachable!(),
         }
+    }
+}
+
+impl BinaryOp {
+    pub fn is_arithmetic(&self) -> bool {
+        matches!(self, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Rem)
     }
 }

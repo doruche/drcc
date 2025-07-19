@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::common::*;
 use crate::sem::{
-    FuncSymbol, HirBinaryOp, HirParam, HirUnaryOp, StaticVarSymbol
+    HirBinaryOp, HirParam, HirUnaryOp,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,9 +33,10 @@ pub enum BinaryOp {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operand {
-    Imm(i64),
+    Imm(Constant),
     Var {
         name: StrDescriptor,
+        // Some(..) for local variables, None for static variables
         local_id: Option<usize>,
     },
     Temp(usize),

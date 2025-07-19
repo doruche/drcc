@@ -82,7 +82,7 @@ impl Parser {
             // 1. undefined behavior, if the value is used by the caller
             // 2. works fine, if the value is not used by the caller
             // hence, we insert a 'ret 0' instruction to make sure the standard is followed
-            func_insns.push(Insn::Return(Some(Operand::Imm(0))));
+            func_insns.push(Insn::Return(Some(Operand::Imm(Constant::Int(0)))));
 
             functions.insert(name, Function {
                 return_type,
@@ -113,6 +113,7 @@ pub(super) fn parse_block_item(
                 data_type,
                 local_id,
                 initializer,
+                ..
             } = local_var_decl;
 
             let var = Operand::Var {
@@ -309,8 +310,11 @@ pub(super) fn parse_expr(
     next_branch_label: &mut usize,
 ) -> Result<(Operand, Option<Vec<Insn>>)> {
     let type_ = expr.type_;
-    let expr = expr.expr;
+    let expr = expr.untyped;
     match expr {
+        HirExpr::Cast { target, expr, .. } => {
+            todo!()
+        },
         HirExpr::IntegerLiteral(val) => {
             Ok((Operand::Imm(val), None))
         },
@@ -360,70 +364,71 @@ pub(super) fn parse_expr(
             use BinaryOp::*;
             match op {
                 And|Or => {
-                    let mut top_insns = vec![];
-                    let short_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
-                    let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
-                    *next_branch_label += 2;
+                    todo!()
+                    // let mut top_insns = vec![];
+                    // let short_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+                    // let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
+                    // *next_branch_label += 2;
 
-                    let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
-                    if let Some(left_insns) = left_insns {
-                        top_insns.extend(left_insns);
-                    }
-                    if let And = op {
-                        top_insns.push(Insn::BranchIfZero {
-                            src: left_operand,
-                            label: short_lable,
-                        });
-                    } else {
-                        top_insns.push(Insn::BranchNotZero {
-                            src: left_operand,
-                            label: short_lable,
-                        });
-                    }
+                    // let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
+                    // if let Some(left_insns) = left_insns {
+                    //     top_insns.extend(left_insns);
+                    // }
+                    // if let And = op {
+                    //     top_insns.push(Insn::BranchIfZero {
+                    //         src: left_operand,
+                    //         label: short_lable,
+                    //     });
+                    // } else {
+                    //     top_insns.push(Insn::BranchNotZero {
+                    //         src: left_operand,
+                    //         label: short_lable,
+                    //     });
+                    // }
 
-                    let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
-                    if let Some(right_insns) = right_insns {
-                        top_insns.extend(right_insns);
-                    }
-                    if let And = op {
-                        top_insns.push(Insn::BranchIfZero {
-                            src: right_operand,
-                            label: short_lable,
-                        });
-                    } else {
-                        top_insns.push(Insn::BranchNotZero {
-                            src: right_operand,
-                            label: short_lable,
-                        });
-                    }
-                    let result_operand = Operand::Temp(*next_temp_id);
-                    *next_temp_id += 1;
-                    if let And = op {
-                        top_insns.push(Insn::Move {
-                            src: Operand::Imm(1),
-                            dst: result_operand,
-                        });
-                    } else {
-                        top_insns.push(Insn::Move {
-                            src: Operand::Imm(0),
-                            dst: result_operand,
-                        });
-                    }
-                    top_insns.push(Insn::Jump(end_lable));
-                    top_insns.push(Insn::Label(short_lable));
-                    if let And = op {
-                        top_insns.push(Insn::Move {
-                            src: Operand::Imm(0),
-                            dst: result_operand,
-                        });
-                    } else {
-                        top_insns.push(Insn::Move {
-                            src: Operand::Imm(1),
-                            dst: result_operand,
-                        });
-                    }
-                    top_insns.push(Insn::Label(end_lable));
-                    Ok((result_operand, Some(top_insns)))
+                    // let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
+                    // if let Some(right_insns) = right_insns {
+                    //     top_insns.extend(right_insns);
+                    // }
+                    // if let And = op {
+                    //     top_insns.push(Insn::BranchIfZero {
+                    //         src: right_operand,
+                    //         label: short_lable,
+                    //     });
+                    // } else {
+                    //     top_insns.push(Insn::BranchNotZero {
+                    //         src: right_operand,
+                    //         label: short_lable,
+                    //     });
+                    // }
+                    // let result_operand = Operand::Temp(*next_temp_id);
+                    // *next_temp_id += 1;
+                    // if let And = op {
+                    //     top_insns.push(Insn::Move {
+                    //         src: Operand::Imm(1),
+                    //         dst: result_operand,
+                    //     });
+                    // } else {
+                    //     top_insns.push(Insn::Move {
+                    //         src: Operand::Imm(0),
+                    //         dst: result_operand,
+                    //     });
+                    // }
+                    // top_insns.push(Insn::Jump(end_lable));
+                    // top_insns.push(Insn::Label(short_lable));
+                    // if let And = op {
+                    //     top_insns.push(Insn::Move {
+                    //         src: Operand::Imm(0),
+                    //         dst: result_operand,
+                    //     });
+                    // } else {
+                    //     top_insns.push(Insn::Move {
+                    //         src: Operand::Imm(1),
+                    //         dst: result_operand,
+                    //     });
+                    // }
+                    // top_insns.push(Insn::Label(end_lable));
+                    // Ok((result_operand, Some(top_insns)))
                 },
                 Add|Sub|Mul|Div|Rem|
                 Ls|Gt|GtEq|LsEq|Eq|NotEq => {
@@ -452,16 +457,14 @@ pub(super) fn parse_expr(
         },
         HirExpr::Var(var) => {
             match var {
-                HirVariable::Indeterminate(_) => 
-                    panic!("Internal error: Indeterminate variable should not be present in HIR."),
-                HirVariable::Local { name, local_id } => {
+                HirVariable::Local { name, local_id, data_type } => {
                     let operand = Operand::Var {
                         name,
                         local_id: Some(local_id),
                     };
                     Ok((operand, None))
                 },
-                HirVariable::Static { name } => {
+                HirVariable::Static { name, data_type } => {
                     let operand = Operand::Var {
                         name,
                         local_id: None,
@@ -489,7 +492,12 @@ pub(super) fn parse_expr(
             insns.push(insn);
             Ok((left_operand, Some(insns)))
         },
-        HirExpr::Ternary { condition, then_expr, else_expr } => {
+        HirExpr::Ternary { 
+            condition, 
+            then_expr, 
+            else_expr,
+            .. 
+        } => {
             let mut top_insns = vec![];
             let (cond_operand, cond_insns) = parse_expr(*condition, next_temp_id, next_branch_label)?;
             if let Some(cond_insns) = cond_insns {

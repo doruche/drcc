@@ -5,6 +5,7 @@ use crate::ast::{
     AstTopLevel,
     AstExpr,
 };
+use crate::sem::typecheck::TypeChecker;
 use super::{
     TopLevel,
     LocalVarDecl,
@@ -75,10 +76,31 @@ impl Parser {
             lresolver.resolve_func(func)?;
         }
 
+        // type checking
+        let symtb = self.symtb;
+        let functions = self.functions;
+        let mut static_vars = self.static_vars;
+        let mut typed_functions = vec![];
+        let mut typed_static_vars = vec![];
+        let mut tchecker = TypeChecker::new(
+            &symtb.func_defs,
+            &strtb,
+        );
+        for (name, func) in functions {
+            let typed_func = tchecker.type_function(func)?;
+            typed_functions.push((name, typed_func));
+        }
+        for (name, var) in static_vars {
+            let typed_var = tchecker.type_static_var(var)?;
+            typed_static_vars.push((name, typed_var));
+        }
+        let typed_functions = typed_functions.into_iter().collect();
+        let typed_static_vars = typed_static_vars.into_iter().collect();
+
         Ok(TopLevel {
             strtb,
-            funcs: self.functions,
-            static_vars: self.static_vars,
+            funcs: typed_functions,
+            static_vars: typed_static_vars,
         })
     }
 

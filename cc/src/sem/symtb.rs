@@ -35,6 +35,7 @@ pub enum CommonSymbol {
 pub struct CommonVar {
     pub name: StrDescriptor,
     pub local_id: Option<usize>,
+    pub data_type: DataType,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -388,7 +389,7 @@ impl SymbolTable {
             self.static_vars.insert(name, static_var_symbol);
             self.common_ns.last_mut()
                 .expect("Internal error: no current scope")
-                .insert(name, CommonSymbol::Var(CommonVar { name, local_id: None }));
+                .insert(name, CommonSymbol::Var(CommonVar { name, data_type: type_, local_id: None }));
         }
 
         Ok(())
@@ -397,6 +398,7 @@ impl SymbolTable {
     pub fn ndef_var(
         &mut self, 
         name: StrDescriptor,
+        data_type: DataType,
         local_id: Option<usize>,
     ) -> Result<(), SymError> {
         let cur_scope = self.common_ns.last_mut()
@@ -405,7 +407,7 @@ impl SymbolTable {
             return Err(SymError::DuplicateDecl(name));
         }
 
-        cur_scope.insert(name, CommonSymbol::Var(CommonVar { name, local_id }));
+        cur_scope.insert(name, CommonSymbol::Var(CommonVar { name, data_type, local_id }));
         Ok(())
     }
 

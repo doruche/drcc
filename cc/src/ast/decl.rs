@@ -1,4 +1,4 @@
-use crate::common::*;
+use crate::{ast::parser::parse_types, common::*};
 use super::{
     Parser,
     Decl,
@@ -23,19 +23,15 @@ impl Parser {
                 break;
             }
         }
-        if types.is_empty() {
-            return Err(Error::Parse("Expected a type for declaration".into()));
-        }
-        // currentlt, only int type is supported
-        if types.len() > 1 || !matches!(types[0].get_type(), TokenType::Int) {
-            return Err(Error::Parse("Only 'int' type is supported for declaration".into()));
-        }
-
-        let type_token = types[0];
-
+ 
+        let types = types.into_iter()
+            .map(|t| t.inner.as_type())
+            .collect::<Vec<_>>();
+        let data_type = parse_types(types, self.cur_span())?;
+ 
         let name_token = self.eat(TokenType::Identifier, "Expected an identifier for declaration")?;
         if self.is_at_end() {
-            return Err(Error::Parse("Unexpected end of input while parsing declaration.".into()));
+            return Err(Error::parse("Unexpected end of input while parsing declaration.", self.cur_span()))
         }
 
         match self.peek().unwrap().get_type() {
@@ -54,7 +50,7 @@ impl Parser {
                 } else {
                     loop {
                         if self.is_at_end() {
-                            return Err(Error::Parse("Unexpected end of input while parsing function parameters.".into()));
+                            return Err(Error::parse("Unexpected end of input while parsing function parameters.", name_token.span));
                         }
                         let next_token_type = self.peek().unwrap().get_type();
                         if next_token_type == TokenType::RParen {
@@ -69,14 +65,14 @@ impl Parser {
 
                         let id_token = self.eat(TokenType::Identifier, "Expected an identifier for function parameter")?;
                         if self.is_at_end() {
-                            return Err(Error::Parse("Unexpected end of input while parsing function parameters.".into()));
+                            return Err(Error::parse("Unexpected end of input while parsing function parameters.", id_token.span));
                         }
                         if self.peek().unwrap().get_type() == TokenType::Comma {
                             self.eat_current();
                         }
                         params.push(Param {
                             name: id_token.inner.as_identifier(),
-                            data_type: DataType::Int,
+                            data_type: param_type_token.inner.as_type(),
                             span: id_token.span,
                         });
                     }               
@@ -97,7 +93,7 @@ impl Parser {
                         }
                         self.eat(TokenType::RBrace, "Expected '}' to close function body.")?;
                         Ok(Decl::FuncDecl {
-                            return_type: (DataType::Int, type_token.span),
+                            return_type: data_type,
                             storage_class,
                             name: (name_token.inner.as_identifier(), name_token.span),
                             params,
@@ -107,7 +103,7 @@ impl Parser {
                     TokenType::Semicolon => {
                         self.eat_current();
                         Ok(Decl::FuncDecl {
-                            return_type: (DataType::Int, type_token.span),
+                            return_type: data_type,
                             storage_class,
                             name: (name_token.inner.as_identifier(), name_token.span),
                             params,
@@ -125,7 +121,8 @@ impl Parser {
                         Ok(Decl::VarDecl {
                             name: (name_token.inner.as_identifier(), name_token.span),
                             storage_class,
-                            data_type: (DataType::Int, type_token.span),
+                            span: name_token.span,
+                            data_type,
                             initializer: None,
                         })
                     },
@@ -136,7 +133,8 @@ impl Parser {
                         Ok(Decl::VarDecl {
                             name: (name_token.inner.as_identifier(), name_token.span),
                             storage_class,
-                            data_type: (DataType::Int, type_token.span),
+                            span: name_token.span,
+                            data_type,
                             initializer: Some(Box::new(initializer)),
                         })
                     },
@@ -169,17 +167,14 @@ impl Parser {
             }
         }
 
-        if types.is_empty() {
-            return Err(Error::Parse("Expected a type for variable declaration".into()));
-        }
-        if types.len() > 1 || !matches!(types[0].get_type(), TokenType::Int) {
-            return Err(Error::Parse("Only 'int' type is supported for variable declaration".into()));
-        }
+        let types = types.into_iter()
+            .map(|t| t.inner.as_type())
+            .collect::<Vec<_>>();
+        let data_type = parse_types(types, self.cur_span())?;
 
-        let type_token = types[0];
         let id_token = self.eat(TokenType::Identifier, "Expected an identifier for variable declaration")?;
         if self.is_at_end() {
-            return Err(Error::Parse("Unexpected end of input while parsing variable declaration.".into()));
+            return Err(Error::parse("Unexpected end of input while parsing variable declaration.", self.cur_span()));
         }
 
         match self.peek().unwrap().get_type() {
@@ -188,7 +183,8 @@ impl Parser {
                 Ok(Decl::VarDecl {
                     name: (id_token.inner.as_identifier(), id_token.span),
                     storage_class,
-                    data_type: (DataType::Int, type_token.span),
+                    span: id_token.span,
+                    data_type,
                     initializer: None,
                 })
             },
@@ -199,7 +195,8 @@ impl Parser {
                 Ok(Decl::VarDecl {
                     name: (id_token.inner.as_identifier(), id_token.span),
                     storage_class,
-                    data_type: (DataType::Int, type_token.span),
+                    span: id_token.span,
+                    data_type,
                     initializer: Some(Box::new(initializer)),
                 })
             },

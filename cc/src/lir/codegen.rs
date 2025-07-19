@@ -28,7 +28,6 @@ impl Parser {
     }
 
     pub fn parse(mut self, tac: TacTopLevel) -> Result<TopLevel> {
-
         todo!()
     }
 }

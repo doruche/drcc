@@ -13,6 +13,7 @@ pub use string_pool::{StringPool, StrDescriptor};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataType {
     Int,
+    Long,
     Void,
     Indeterminate,
 }
@@ -21,7 +22,20 @@ impl DataType {
     pub fn size(&self) -> usize {
         match self {
             DataType::Int => 4,
+            DataType::Long => 8,
             _ => panic!("Size not defined for this data type"),
+        }
+    }
+
+    /// this always returns the super type of the two data types.
+    /// if the two types are not compatible , it returns an error.
+    pub fn common(&self, other: &DataType, span: Span) -> Result<DataType> {
+        match (self, other) {
+            (a, b) if a == b => Ok(*a),
+            (DataType::Int, DataType::Long) | (DataType::Long, DataType::Int) => Ok(DataType::Long),
+            _ => Err(Error::semantic(format!(
+                "Cannot use {} and {} together", self, other
+            ), span)),
         }
     }
 }
@@ -55,13 +69,15 @@ pub enum InitVal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Constant {
-    Integer(i64),
+    Int(i32),
+    Long(i64),
 }
 
 impl Display for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Constant::Integer(value) => write!(f, "{}", value),
+            Constant::Int(value) => write!(f, "{}", value),
+            Constant::Long(value) => write!(f, "{}", value),
         }
     }
 }
@@ -70,6 +86,7 @@ impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DataType::Int => write!(f, "int"),
+            DataType::Long => write!(f, "long"),
             DataType::Void => write!(f, "void"),
             DataType::Indeterminate => write!(f, "indeterminate"),
         }

@@ -11,7 +11,7 @@ pub struct TopLevel {
 #[derive(Debug, Clone)]
 pub enum Decl {
     FuncDecl {
-        return_type: (DataType, Span),
+        return_type: DataType,
         storage_class: StorageClass,
         name: (StrDescriptor, Span),
         params: Vec<Param>,
@@ -20,7 +20,8 @@ pub enum Decl {
     VarDecl {
         storage_class: StorageClass,
         name: (StrDescriptor, Span),
-        data_type: (DataType, Span),
+        span: Span,
+        data_type: DataType,
         initializer: Option<Box<Expr>>,
     }
 }
@@ -41,7 +42,7 @@ pub enum BlockItem {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    IntegerLiteral(i64),
+    IntegerLiteral(Constant),
     Variable(StrDescriptor, Span),
     Assignment {
         span: Span,
@@ -54,6 +55,7 @@ pub enum Expr {
         args: Vec<Expr>,
     },
     Ternary {
+        span: Span,
         condition: Box<Expr>,
         then_expr: Box<Expr>,
         else_expr: Box<Expr>,
@@ -64,7 +66,12 @@ pub enum Expr {
         op: (BinaryOp, Span),
         left: Box<Expr>,
         right: Box<Expr>
-    }
+    },
+    Cast {
+        target: DataType,
+        expr: Box<Expr>,
+        span: Span,
+    },
 }
 
 impl Expr {
@@ -74,7 +81,7 @@ impl Expr {
 
     pub fn to_constant(self) -> Constant {
         match self {
-            Expr::IntegerLiteral(value) => Constant::Integer(value),
+            Expr::IntegerLiteral(value) => value,
             _ => panic!("Internal error: expected constant expression"),
         }
     }

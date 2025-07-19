@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use crate::{common::{span::Span, StorageClass, StrDescriptor}, span};
+use crate::{common::{span::Span, Constant, DataType, StorageClass, StrDescriptor}, span};
 use crate::ast::AstBinaryOp;
 
 /// Token without any additional information.
@@ -20,11 +20,12 @@ pub enum RawToken {
     Return, If, Else, QuestionMark, Colon, Comma,
     While, Do, For, Break, Continue,
     Extern, Static,
-    Int, Void, 
+    Int, Long, Void,
 
 
     // [0-9]+
-    Integer(i64),
+    IntLiteral(i32),
+    LongLiteral(i64),
     // [a-zA-Z_][a-zA-Z0-9_]*
     Identifier(StrDescriptor),
 
@@ -72,8 +73,10 @@ pub enum TokenType {
     Extern,
     Static,
     Int,
+    Long,
     Void,
-    Integer,
+    IntLiteral,
+    LongLiteral,
     Identifier,
 
     Nothing,
@@ -131,8 +134,10 @@ impl Token {
             RawToken::Extern => TokenType::Extern,
             RawToken::Static => TokenType::Static,
             RawToken::Int => TokenType::Int,
+            RawToken::Long => TokenType::Long,
             RawToken::Void => TokenType::Void,
-            RawToken::Integer(_) => TokenType::Integer,
+            RawToken::IntLiteral(_) => TokenType::IntLiteral,
+            RawToken::LongLiteral(_) => TokenType::LongLiteral,
             RawToken::Identifier(_) => TokenType::Identifier,
             RawToken::Nothing => TokenType::Nothing,
         }
@@ -148,7 +153,7 @@ impl Token {
 
     pub fn is_type(&self) -> bool {
         use TokenType::*;
-        matches!(self.get_type(), Int | Void)
+        matches!(self.get_type(), Int | Long)
     }
 
     pub fn is_specifier(&self) -> bool {
@@ -207,7 +212,10 @@ impl Token {
     }
 
     pub fn take(&mut self) -> Self {
-        std::mem::take(self)
+        let prev_span = self.span;
+        let cur = std::mem::take(self);
+        self.span = prev_span;
+        cur
     }
 }
 
@@ -221,11 +229,19 @@ impl Default for Token {
 }
 
 impl RawToken {
-    pub fn as_integer(self) -> i64 {
-        if let RawToken::Integer(val) = self {
-            val
-        } else {
-            panic!("Internal error: expected an integer token, found {:?}", self);
+    pub fn as_type(self) -> DataType {
+        match self {
+            RawToken::Int => DataType::Int,
+            RawToken::Long => DataType::Long,
+            _ => panic!("Internal error: expected a variable type token, found {:?}", self),
+        }
+    }
+
+    pub fn as_constant(self) -> Constant {
+        match self {
+            RawToken::IntLiteral(value) => Constant::Int(value),
+            RawToken::LongLiteral(value) => Constant::Long(value),
+            _ => panic!("Internal error: expected a constant token, found {:?}", self),
         }
     }
 
