@@ -38,8 +38,19 @@ pub enum Operand {
         name: StrDescriptor,
         // Some(..) for local variables, None for static variables
         local_id: Option<usize>,
+        data_type: DataType,
     },
-    Temp(usize),
+    Temp(usize, DataType),
+}
+
+impl Operand {
+    pub fn data_type(&self) -> DataType {
+        match self {
+            Operand::Imm(constant) => constant.data_type(),
+            Operand::Var { data_type, .. } => *data_type,
+            Operand::Temp(_, data_type) => *data_type,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,6 +117,14 @@ pub enum Insn {
         src: Operand,
         dst: Operand,
     },
+    Truncate {
+        src: Operand,
+        dst: Operand,
+    },
+    SignExt {
+        src: Operand,
+        dst: Operand,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -148,7 +167,8 @@ impl From<HirBinaryOp> for BinaryOp {
             HirBinaryOp::NotEq => BinaryOp::NotEq,
             HirBinaryOp::And => BinaryOp::And,
             HirBinaryOp::Or => BinaryOp::Or,
-            HirBinaryOp::Assign => BinaryOp::Assign,
+            
+            HirBinaryOp::Assign => unreachable!(),
         }
     }
 }

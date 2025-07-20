@@ -7,7 +7,7 @@ static int
 b() {
 }
 
-static int x = 42;
+static int x = 42l;
 extern int x;
 int y;
 int y;

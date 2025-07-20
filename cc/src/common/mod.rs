@@ -38,6 +38,14 @@ impl DataType {
             ), span)),
         }
     }
+
+    pub fn sized_str(&self) -> &str {
+        match self {
+            DataType::Int => "i32",
+            DataType::Long => "i64",
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +79,15 @@ pub enum InitVal {
 pub enum Constant {
     Int(i32),
     Long(i64),
+}
+
+impl Constant {
+    pub fn data_type(&self) -> DataType {
+        match self {
+            Constant::Int(_) => DataType::Int,
+            Constant::Long(_) => DataType::Long,
+        }
+    }
 }
 
 impl Display for Constant {

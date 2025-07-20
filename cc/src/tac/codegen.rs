@@ -119,6 +119,7 @@ pub(super) fn parse_block_item(
             let var = Operand::Var {
                 name,
                 local_id: Some(local_id),
+                data_type,
             };
             
             let mut insns = vec![];
@@ -145,7 +146,7 @@ pub(super) fn parse_stmt(
 ) -> Result<Vec<Insn>> {
     let mut top_insns = vec![];
     match stmt {
-        HirStmt::Return { span, expr } => {
+        HirStmt::Return { expr , ..} => {
             let (operand, insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
                 let insn = Insn::Return(Some(operand));
                 let insns = match insns {
@@ -311,8 +312,51 @@ pub(super) fn parse_expr(
 ) -> Result<(Operand, Option<Vec<Insn>>)> {
     let type_ = expr.type_;
     let expr = expr.untyped;
+    let dst = Operand::Temp(*next_temp_id, type_);
+    *next_temp_id += 1;
+
     match expr {
         HirExpr::Cast { target, expr, .. } => {
+            // now we only have int and long, so sext and trunc are enough
+            let (src_operand, insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
+            
+            match (src_operand.data_type(), target) {
+                (a, b) if a == b => {
+                    *next_temp_id -= 1;
+                    return Ok((src_operand, insns));
+                },
+                (DataType::Int, DataType::Long) => {
+                    let insn = Insn::SignExt {
+                        src: src_operand,
+                        dst,
+                    };
+                    let insns = match insns {
+                        Some(mut vec) => {
+                            vec.push(insn);
+                            vec
+                        },
+                        None => vec![insn],
+                    };
+                    return Ok((dst, Some(insns)));
+                },
+                (DataType::Long, DataType::Int) => {
+                    let insn = Insn::Truncate {
+                        src: src_operand,
+                        dst,
+                    };
+                    let insns = match insns {
+                        Some(mut vec) => {
+                            vec.push(insn);
+                            vec
+                        },
+                        None => vec![insn],
+                    };
+                    return Ok((dst, Some(insns)));
+                },
+                _ => unreachable!(),
+            }
+
+            
             todo!()
         },
         HirExpr::IntegerLiteral(val) => {
@@ -320,12 +364,10 @@ pub(super) fn parse_expr(
         },
         HirExpr::Unary((op, span), expr) => {
             let (src, mut insns) = parse_expr(*expr, next_temp_id, next_branch_label)?;
-            let temp_id = *next_temp_id;
-            *next_temp_id += 1;
             let insn = Insn::Unary {
                 op: op.into(),
                 src,
-                dst: Operand::Temp(temp_id),
+                dst,
             };
             let insns = match insns {
                 Some(mut vec) => {
@@ -334,7 +376,7 @@ pub(super) fn parse_expr(
                 },
                 None => Some(vec![insn]),
             };
-            Ok((Operand::Temp(temp_id), insns))
+            Ok((dst, insns))
         }
         HirExpr::Group(inner) => {
             parse_expr(*inner, next_temp_id, next_branch_label)
@@ -342,8 +384,6 @@ pub(super) fn parse_expr(
         HirExpr::FuncCall { name, span, args } => {
             let mut top_insns = vec![];
             let mut arg_operands = vec![];
-            let dst_operand = Operand::Temp(*next_temp_id);
-            *next_temp_id += 1;
             for arg in args {
                 let (operand, insns) = parse_expr(arg, next_temp_id, next_branch_label)?;
                 if let Some(insns) = insns {
@@ -354,93 +394,89 @@ pub(super) fn parse_expr(
             let insn = Insn::FuncCall {
                 target: name,
                 args: arg_operands,
-                dst: dst_operand,
+                dst,
             };
             top_insns.push(insn);
-            Ok((dst_operand, Some(top_insns)))
+            Ok((dst, Some(top_insns)))
         },
-        HirExpr::Binary { op: (op, span), left, right } => {
+        HirExpr::Binary { op: (op, ..), left, right } => {
             let op = op.into();
             use BinaryOp::*;
             match op {
                 And|Or => {
-                    todo!()
-                    // let mut top_insns = vec![];
-                    // let short_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
-                    // let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
-                    // *next_branch_label += 2;
+                    let mut top_insns = vec![];
+                    let short_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
+                    let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
+                    *next_branch_label += 2;
 
-                    // let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
-                    // if let Some(left_insns) = left_insns {
-                    //     top_insns.extend(left_insns);
-                    // }
-                    // if let And = op {
-                    //     top_insns.push(Insn::BranchIfZero {
-                    //         src: left_operand,
-                    //         label: short_lable,
-                    //     });
-                    // } else {
-                    //     top_insns.push(Insn::BranchNotZero {
-                    //         src: left_operand,
-                    //         label: short_lable,
-                    //     });
-                    // }
+                    let (left_operand, left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
+                    if let Some(left_insns) = left_insns {
+                        top_insns.extend(left_insns);
+                    }
+                    if let And = op {
+                        top_insns.push(Insn::BranchIfZero {
+                            src: left_operand,
+                            label: short_lable,
+                        });
+                    } else {
+                        top_insns.push(Insn::BranchNotZero {
+                            src: left_operand,
+                            label: short_lable,
+                        });
+                    }
 
-                    // let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
-                    // if let Some(right_insns) = right_insns {
-                    //     top_insns.extend(right_insns);
-                    // }
-                    // if let And = op {
-                    //     top_insns.push(Insn::BranchIfZero {
-                    //         src: right_operand,
-                    //         label: short_lable,
-                    //     });
-                    // } else {
-                    //     top_insns.push(Insn::BranchNotZero {
-                    //         src: right_operand,
-                    //         label: short_lable,
-                    //     });
-                    // }
-                    // let result_operand = Operand::Temp(*next_temp_id);
-                    // *next_temp_id += 1;
-                    // if let And = op {
-                    //     top_insns.push(Insn::Move {
-                    //         src: Operand::Imm(1),
-                    //         dst: result_operand,
-                    //     });
-                    // } else {
-                    //     top_insns.push(Insn::Move {
-                    //         src: Operand::Imm(0),
-                    //         dst: result_operand,
-                    //     });
-                    // }
-                    // top_insns.push(Insn::Jump(end_lable));
-                    // top_insns.push(Insn::Label(short_lable));
-                    // if let And = op {
-                    //     top_insns.push(Insn::Move {
-                    //         src: Operand::Imm(0),
-                    //         dst: result_operand,
-                    //     });
-                    // } else {
-                    //     top_insns.push(Insn::Move {
-                    //         src: Operand::Imm(1),
-                    //         dst: result_operand,
-                    //     });
-                    // }
-                    // top_insns.push(Insn::Label(end_lable));
-                    // Ok((result_operand, Some(top_insns)))
+                    let (right_operand, right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
+                    if let Some(right_insns) = right_insns {
+                        top_insns.extend(right_insns);
+                    }
+                    if let And = op {
+                        top_insns.push(Insn::BranchIfZero {
+                            src: right_operand,
+                            label: short_lable,
+                        });
+                    } else {
+                        top_insns.push(Insn::BranchNotZero {
+                            src: right_operand,
+                            label: short_lable,
+                        });
+                    }
+
+                    if let And = op {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(Constant::Int(1)),
+                            dst,
+                        });
+                    } else {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(Constant::Int(0)),
+                            dst,
+                        });
+                    }
+                    top_insns.push(Insn::Jump(end_lable));
+                    top_insns.push(Insn::Label(short_lable));
+                    if let And = op {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(Constant::Int(0)),
+                            dst,
+                        });
+                    } else {
+                        top_insns.push(Insn::Move {
+                            src: Operand::Imm(Constant::Int(1)),
+                            dst,
+                        });
+                    }
+                    top_insns.push(Insn::Label(end_lable));
+                    Ok((dst, Some(top_insns)))
                 },
                 Add|Sub|Mul|Div|Rem|
                 Ls|Gt|GtEq|LsEq|Eq|NotEq => {
                     let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
                     let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
-                    let temp_id = *next_temp_id;
-                    *next_temp_id += 1;
                     let insn = Insn::Binary {
                         op,
                         left: left_operand,
                         right: right_operand,
-                        dst: Operand::Temp(temp_id),
+                        dst,
                     };
                     let mut insns = vec![];
                     if let Some(left_insns) = left_insns {
@@ -450,17 +486,21 @@ pub(super) fn parse_expr(
                         insns.extend(right_insns);
                     }
                     insns.push(insn);
-                    Ok((Operand::Temp(temp_id), Some(insns)))
+                    Ok((dst, Some(insns)))
                 },
                 Assign => unreachable!(),
             }
         },
         HirExpr::Var(var) => {
+            // no need to allocate a temp id for variables.
+            *next_temp_id -= 1;
+            
             match var {
                 HirVariable::Local { name, local_id, data_type } => {
                     let operand = Operand::Var {
                         name,
                         local_id: Some(local_id),
+                        data_type,
                     };
                     Ok((operand, None))
                 },
@@ -468,12 +508,15 @@ pub(super) fn parse_expr(
                     let operand = Operand::Var {
                         name,
                         local_id: None,
+                        data_type,
                     };
                     Ok((operand, None))
                 }
             }
         },
         HirExpr::Assignment { span, left, right } => {
+            *next_temp_id -= 1;
+            
             let (left_operand, mut left_insns) = parse_expr(*left, next_temp_id, next_branch_label)?;
             let (right_operand, mut right_insns) = parse_expr(*right, next_temp_id, next_branch_label)?;
             
@@ -506,8 +549,6 @@ pub(super) fn parse_expr(
 
             let else_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label));
             let end_label = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
-            let result_operand = Operand::Temp(*next_temp_id);
-            *next_temp_id += 1;
 
             *next_branch_label += 2;
             top_insns.push(Insn::BranchIfZero {
@@ -520,7 +561,7 @@ pub(super) fn parse_expr(
             }
             top_insns.push(Insn::Move {
                 src: then_operand,
-                dst: result_operand,
+                dst,
             });
             top_insns.push(Insn::Jump(end_label));
             top_insns.push(Insn::Label(else_label));
@@ -530,10 +571,10 @@ pub(super) fn parse_expr(
             }
             top_insns.push(Insn::Move {
                 src: else_operand,
-                dst: result_operand,
+                dst,
             });
             top_insns.push(Insn::Label(end_label));
-            Ok((result_operand, Some(top_insns)))
+            Ok((dst, Some(top_insns)))
         },
     }
 }

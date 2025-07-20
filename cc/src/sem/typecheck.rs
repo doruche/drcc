@@ -95,18 +95,8 @@ impl<'a> TypeChecker<'a> {
     ) -> Result<BlockItem> {
         match item {
             BlockItem::Declaration(mut decl) => {
-                // local variable declaration.
-                // should cast the initializer if it exists and if necessary.
-                if let Some(init) = decl.initializer {
-                    let typed_init = self.type_expr(init)?;
-                    let unified_init = try_cast(
-                        decl.data_type,
-                        typed_init,
-                        decl.span,
-                    )?;
-                    decl.initializer = Some(unified_init);
-                }
-                Ok(BlockItem::Declaration(decl))
+                let typed_decl = self.type_local_var_decl(decl)?;
+                Ok(BlockItem::Declaration(typed_decl))
             },
             BlockItem::Statement(stmt) =>
                 Ok(BlockItem::Statement(self.type_stmt(stmt)?)),
@@ -126,7 +116,12 @@ impl<'a> TypeChecker<'a> {
                 }
                 Ok(Stmt::Compound(typed_items))
             },
-            Stmt::While { body, controller, span, loop_label } => {
+            Stmt::While { 
+                body, 
+                controller, 
+                span, 
+                loop_label 
+            } => {
                 let typed_body = self.type_stmt(*body)?;
                 let typed_controller = self.type_expr(*controller)?;
                 Ok(Stmt::While {
@@ -136,7 +131,12 @@ impl<'a> TypeChecker<'a> {
                     loop_label,
                 })
             },
-            Stmt::DoWhile { body, controller, span, loop_label } => {
+            Stmt::DoWhile { 
+                body, 
+                controller, 
+                span, 
+                loop_label 
+            } => {
                 let typed_body = self.type_stmt(*body)?;
                 let typed_controller = self.type_expr(*controller)?;
                 Ok(Stmt::DoWhile {
@@ -146,6 +146,37 @@ impl<'a> TypeChecker<'a> {
                     loop_label,
                 })
             },
+            Stmt::For {
+                body,
+                controller,
+                initializer,
+                post,
+                loop_label,
+                span,
+            } => {
+                let typed_body = self.type_stmt(*body)?;
+                let typed_controller = controller.map(|c| {
+                    self.type_expr(*c)
+                }).transpose()?
+                .map(Box::new);
+                let typed_init = initializer.map(|init| {
+                    self.type_for_init(*init)
+                }).transpose()?
+                .map(Box::new);
+                let typed_post = post.map(|post| {
+                    self.type_expr(*post)
+                }).transpose()?
+                .map(Box::new);
+
+                Ok(Stmt::For {
+                    body: Box::new(typed_body),
+                    controller: typed_controller,
+                    initializer: typed_init,
+                    post: typed_post,
+                    loop_label,
+                    span,
+                })
+            }
             Stmt::Return { span, expr } => {
                 let typed_expr = self.type_expr(*expr)?;
                 let cur_return_type = self.cur_return_type
@@ -160,7 +191,70 @@ impl<'a> TypeChecker<'a> {
                     expr: Box::new(unified_expr),
                 })
             }
+            Stmt::Expr(expr) => {
+                let typed_expr = self.type_expr(*expr)?;
+                Ok(Stmt::Expr(Box::new(typed_expr)))
+            },
+            Stmt::If { 
+                condition, 
+                then_branch, 
+                else_branch 
+            } => {
+                let typed_condition = self.type_expr(*condition)?;
+                let typed_then = self.type_stmt(*then_branch)?;
+                let typed_else = if let Some(else_branch) = else_branch {
+                    Some(Box::new(self.type_stmt(*else_branch)?))
+                } else {
+                    None
+                };
+                Ok(Stmt::If {
+                    condition: Box::new(typed_condition),
+                    then_branch: Box::new(typed_then),
+                    else_branch: typed_else,
+                })
+            },
             _ => Ok(stmt),
+        }
+    }
+
+    pub fn type_local_var_decl(
+        &mut self,
+        decl: LocalVarDecl,
+    ) -> Result<LocalVarDecl> {
+        // local variable declaration.
+        // should cast the initializer if it exists and if necessary.
+        if let Some(init) = decl.initializer {
+            let typed_init = self.type_expr(init)?;
+            let unified_init = try_cast(
+                decl.data_type,
+                typed_init,
+                decl.span,
+            )?;
+            Ok(LocalVarDecl {
+                data_type: decl.data_type,
+                name: decl.name,
+                local_id: decl.local_id,
+                initializer: Some(unified_init),
+                span: decl.span,
+            })
+        } else {
+            Ok(decl)
+        }
+    }
+
+    pub fn type_for_init(
+        &mut self,
+        init: ForInit,
+    ) -> Result<ForInit> {
+        match init {
+            ForInit::Declaration(mut decl) => {
+                let typed_decl = self.type_local_var_decl(decl)?;
+                Ok(ForInit::Declaration(typed_decl))
+            },
+            ForInit::Expression(expr) => {
+                let typed_expr = self.type_expr(*expr)?;
+                Ok(ForInit::Expression(Box::new(typed_expr)))
+            }
         }
     }
 
@@ -185,6 +279,8 @@ impl<'a> TypeChecker<'a> {
             },
             Expr::Var(var) => {
                 expr.type_ = var.data_type();
+                assert_ne!(expr.type_, DataType::Indeterminate,
+                    "Internal error: Variable should have a determined type.");
                 Ok(expr)
             },
             Expr::Cast { 

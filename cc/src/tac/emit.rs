@@ -145,18 +145,29 @@ impl TopLevel {
             Insn::Jump(label) => format!("jmp\t{}", self.emit_label_operand(label)),
             Insn::Move { src, dst} => 
                 format!("mov\t{}, {}", self.emit_operand(dst), self.emit_operand(src)),
+            Insn::Truncate { src, dst } => 
+                format!("trunc\t{}, {}", self.emit_operand(dst), self.emit_operand(src)),
+            Insn::SignExt { src, dst } => 
+                format!("s.ext\t{}, {}", self.emit_operand(dst), self.emit_operand(src)),
         }
     }
 
     fn emit_operand(&self, operand: &Operand) -> String {
         match operand {
-            Operand::Imm(imm) => imm.to_string(),
-            Operand::Temp(tid) => format!("t.{}", tid),
-            Operand::Var { name, local_id } => {
+            Operand::Imm(imm) => match imm {
+                Constant::Int(val) => format!("$[i32]{}", val),
+                Constant::Long(val) => format!("$[i64]{}", val),
+            },
+            Operand::Temp(tid, data_type) => format!("%[{}]t.{}", data_type.sized_str(), tid),
+            Operand::Var {
+                name,
+                local_id,
+                data_type,
+            } => {
                 let name = self.strtb.get(*name).unwrap();
                 match local_id {
-                    Some(id) => format!("{}.{}", name, id),
-                    None => format!("{}", name),
+                    Some(id) => format!("%[{}]{}.{}", data_type.sized_str(), name, id),
+                    None => format!("%[{}]{}", data_type.sized_str(), name),
                 }
             },
         }

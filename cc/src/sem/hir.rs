@@ -37,8 +37,8 @@ impl TopLevel {
             }
             output.push_str(&format!(") -> {}", func.return_type));
             output.push_str(&format!(" {}\n",
-                if func.body.is_some() {
-                    "{ ... }".to_string()
+                if let Some(body) = func.body.as_ref() {
+                    format!("{:#?}", body)
                 } else {
                     "".to_string()
                 },
@@ -50,11 +50,16 @@ impl TopLevel {
     pub fn dump_static_vars(&self) -> String {
         let mut output = String::new();
         for (name, var) in &self.static_vars {
-            output.push_str(&format!("[{}] {}: {}\n",
+            output.push_str(&format!("[{}]\n{} {} ",
             var.linkage,
-            self.strtb.get(*name).unwrap(), 
             var.data_type,
+            self.strtb.get(*name).unwrap(), 
             ));
+            match &var.initializer {
+                InitVal::None => output.push_str("= undefined\n"),
+                InitVal::Const(c) => output.push_str(&format!("= {:?}\n", c)),
+                InitVal::Tentative => output.push_str("= tentative\n"),
+            }
         }
         output
     }
