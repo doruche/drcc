@@ -148,7 +148,7 @@ impl TopLevel {
             Insn::Truncate { src, dst } => 
                 format!("trunc\t{}, {}", self.emit_operand(dst), self.emit_operand(src)),
             Insn::SignExt { src, dst } => 
-                format!("s.ext\t{}, {}", self.emit_operand(dst), self.emit_operand(src)),
+                format!("sext\t{}, {}", self.emit_operand(dst), self.emit_operand(src)),
         }
     }
 

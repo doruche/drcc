@@ -54,7 +54,6 @@ pub struct FuncType {
     pub param_types: Vec<DataType>,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Linkage {
     Internal,
@@ -86,6 +85,13 @@ impl Constant {
         match self {
             Constant::Int(_) => DataType::Int,
             Constant::Long(_) => DataType::Long,
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Constant::Int(value) => *value == 0,
+            Constant::Long(value) => *value == 0,
         }
     }
 }

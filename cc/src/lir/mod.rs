@@ -2,8 +2,8 @@
 //! TAC -> LIR
 //! In this module, we will:
 //! 1. Convert the three-address code (TAC) into a low-level intermediate representation (LIR).
-//! 2. Register allocation.
-//! 3. Instruction canonicalization.
+//! 2. Instruction canonicalization.
+//! 3. Register allocation.
 
 mod lir;
 mod blocks;
