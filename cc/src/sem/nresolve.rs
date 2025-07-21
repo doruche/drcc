@@ -54,6 +54,7 @@ impl Parser {
                         .map(|param| param.data_type)
                         .collect(),
                 };
+                let mut r_params = vec![];
                 let body = if let Some(body) = body {
                     self.symtb.ndef_func(
                         name.0,
@@ -66,9 +67,13 @@ impl Parser {
                         let param_id = self.alloc_local_var();
                         self.symtb.ndef_var(param.name, param.data_type, Some(param_id))
                             .map_err(|e| (e, param.span))?;
+                        r_params.push(Param {
+                            name: param.name,
+                            data_type: param.data_type,
+                            local_id: param_id
+                        });
                     }
 
-                    self.local_var_id_counter = params.len();
                     let mut r_body = vec![];
                     for item in body {
                         if let Some(item) = self.nresolve_block_item(item)? {
@@ -88,24 +93,18 @@ impl Parser {
                     None
                 };
 
-                let params = if body.is_some() {
-                    params.into_iter().map(Param::from).collect()
-                } else {
-                    vec![]
-                };
-
                 if let Some(prev) = self.functions.get_mut(&name.0) {
                     // in symtb.ndef_func/ndecl_func, we already checked
                     // the return type and parameter types, as well as linkage.
                     // so here we just update the body and params.
                     if body.is_some() {
-                        prev.params = params;
+                        prev.params = r_params;
                         prev.body = body;
                     }
                 } else {
                     self.functions.insert(name.0, Function {
                         name: name.0,
-                        params,
+                        params: r_params,
                         return_type,
                         linkage: match storage_class {
                             StorageClass::Static => Linkage::Internal,

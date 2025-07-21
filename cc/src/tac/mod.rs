@@ -7,7 +7,7 @@ mod codegen;
 mod emit;
 mod tac;
 
-pub use codegen::Parser as TacParser;
+pub use codegen::CodeGen as TacCodeGen;
 pub use tac::{
     Operand as TacOperand,
     Insn as TacInsn,
@@ -17,19 +17,23 @@ pub use tac::{
     UnaryOp as TacUnaryOp,
     BinaryOp as TacBinaryOp,
     Param as TacParam,
-    LabelOperand,
-    AutoGenLabel,
+    LocalVar as TacLocalVar,
+    LabelOperand as TacLabelOperand,
+    AutoGenLabel as TacAutoGenLabel,
 };
 
 use tac::{
     Operand,
     Insn,
+    LocalVar,
     Function,
     StaticVar,
     TopLevel,
     UnaryOp,
     BinaryOp,
     Param,
+    LabelOperand,
+    AutoGenLabel,
 };
 
 
@@ -44,34 +48,6 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_expr() {
-        let mut lexer = Lexer::new("1<=3*7>5==1".into());
-        let (tokens, pool) = lexer.lex().unwrap();
-
-        let mut parser = AstParser::new(tokens, pool);
-        let expr = parser.parse_expr().unwrap();
-        let strtb = parser.strtb();
-
-        let mut parser = HirParser::new();
-        let expr = parser.parse_expr(expr, strtb).unwrap();
-
-        let result = codegen::parse_expr(expr, &mut 0, &mut 0);
-        match result {
-            Ok((operand, insns)) => {
-                println!("Operand: {:?}", operand);
-                if let Some(insns) = insns {
-                    for insn in insns {
-                        println!("Insn: {:?}", insn);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-            }
-        }
-    }
-
     fn test_inner(path: &str) {
         let input = read_to_string(path).unwrap();
         let mut lexer = Lexer::new(input.into());
@@ -83,8 +59,8 @@ mod tests {
         let mut parser = HirParser::new();
         let prog = parser.parse(prog).unwrap();
 
-        let mut parser = TacParser::new(prog);
-        let result = parser.parse();
+        let mut parser = TacCodeGen::new();
+        let result = parser.parse(prog);
         match result {
             Ok(tac) => {
                 println!("{:#}", tac.emit_code());

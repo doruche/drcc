@@ -28,7 +28,6 @@ pub enum BinaryOp {
     NotEq,
     And,
     Or,
-    Assign,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +56,7 @@ impl Operand {
 pub struct Param {
     pub name: StrDescriptor,
     pub data_type: DataType,
+    pub local_id: usize,
 }
 
 impl From<HirParam> for Param {
@@ -64,6 +64,7 @@ impl From<HirParam> for Param {
         Param {
             name: param.name,
             data_type: param.data_type,
+            local_id: param.local_id,
         }
     }
 }
@@ -77,6 +78,19 @@ pub enum LabelOperand {
     },
 }
 
+impl LabelOperand {
+    pub fn id(&self) -> usize {
+        match self {
+            LabelOperand::AutoGen(auto_gen) => match auto_gen {
+                AutoGenLabel::Branch(id) => *id,
+                AutoGenLabel::Continue(id) => *id,
+                AutoGenLabel::Break(id) => *id,
+            },
+            LabelOperand::Named { id, .. } => *id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AutoGenLabel {
     Branch(usize),  // normal auto-generated label for branches and loops
@@ -86,7 +100,7 @@ pub enum AutoGenLabel {
 
 #[derive(Debug, Clone)]
 pub enum Insn {
-    Return(Option<Operand>),
+    Return(Operand),
     Unary {
         op: UnaryOp,
         src: Operand,
@@ -127,12 +141,20 @@ pub enum Insn {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LocalVar {
+    pub name: StrDescriptor,
+    pub local_id: usize,
+    pub data_type: DataType,
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     pub return_type: DataType,
     pub linkage: Linkage,
     pub name: StrDescriptor,
     pub params: Vec<Param>,
+    pub local_vars: HashMap<usize, LocalVar>,
     pub body: Vec<Insn>,
 }
 

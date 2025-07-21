@@ -1,32 +1,106 @@
+use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register {
-    Zero,  // x0
-    Ra,    // x1
-    Sp,    // x2
-    Gp,    // x3
-    Tp,    // x4
-    T0,    // x5
-    T1,    // x6
-    T2,    // x7
-    S0,    // x8
-    S1,    // x9
-    A0,    // x10
-    A1,    // x11
-    A2,    // x12
-    A3,    // x13
-    A4,    // x14
-    A5,    // x15
-    A6,    // x16
-    A7,    // x17
-    S2,    // x18
-    S3,    // x19
-    S4,    // x20
-    S5,    // x21
-    S6,    // x22
-    S7,    // x23
-    S8,    // x24
-    S9,    // x25
-    S10,   // x26
-    S11,   // x27
+    Zero, Ra, Sp, Gp, Tp,
+    T0, T1, T2, S0, S1,
+    A0, A1, A2, A3, A4,
+    A5, A6, A7, S2, S3,
+    S4, S5, S6, S7, S8,
+    S9, S10, S11, T3, T4,
+    T5, T6,
+}
+
+impl Display for Register {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Register::Zero => "zero",
+            Register::Ra => "ra",
+            Register::Sp => "sp",
+            Register::Gp => "gp",
+            Register::Tp => "tp",
+            Register::T0 => "t0",
+            Register::T1 => "t1",
+            Register::T2 => "t2",
+            Register::S0 => "s0",
+            Register::S1 => "s1",
+            Register::A0 => "a0",
+            Register::A1 => "a1",
+            Register::A2 => "a2",
+            Register::A3 => "a3",
+            Register::A4 => "a4",
+            Register::A5 => "a5",
+            Register::A6 => "a6",
+            Register::A7 => "a7",
+            Register::S2 => "s2",
+            Register::S3 => "s3",
+            Register::S4 => "s4",
+            Register::S5 => "s5",
+            Register::S6 => "s6",
+            Register::S7 => "s7",
+            Register::S8 => "s8",
+            Register::S9 => "s9",
+            Register::S10 => "s10",
+            Register::S11 => "s11",
+            Register::T3 => "t3",
+            Register::T4 => "t4",
+            Register::T5 => "t5",
+            Register::T6 => "t6",
+        };
+        write!(f, "{name}")
+    }
+}
+
+impl Register {
+    pub fn x(id: usize) -> Self {
+        match id {
+            0 => Register::Zero,
+            1 => Register::Ra,
+            2 => Register::Sp,
+            3 => Register::Gp,
+            4 => Register::Tp,
+            5 => Register::T0,
+            6 => Register::T1,
+            7 => Register::T2,
+            8 => Register::S0,
+            9 => Register::S1,
+            10 => Register::A0,
+            11 => Register::A1,
+            12 => Register::A2,
+            13 => Register::A3,
+            14 => Register::A4,
+            15 => Register::A5,
+            16 => Register::A6,
+            17 => Register::A7,
+            18 => Register::S2,
+            19 => Register::S3,
+            20 => Register::S4,
+            21 => Register::S5,
+            22 => Register::S6,
+            23 => Register::S7,
+            24 => Register::S8,
+            25 => Register::S9,
+            26 => Register::S10,
+            27 => Register::S11,
+            28 => Register::T3,
+            29 => Register::T4,
+            30 => Register::T5,
+            31 => Register::T6,
+            _ => panic!("Internal error: Invalid register ID: {}", id),
+        }
+    }
+
+    pub fn a(id: usize) -> Self {
+        match id {
+            0 => Register::A0,
+            1 => Register::A1,
+            2 => Register::A2,
+            3 => Register::A3,
+            4 => Register::A4,
+            5 => Register::A5,
+            6 => Register::A6,
+            7 => Register::A7,
+            _ => panic!("Internal error: Invalid A register ID: {}", id),
+        }
+    }
 }

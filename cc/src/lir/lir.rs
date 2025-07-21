@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
-use crate::{asm::Register, common::*, tac::LabelOperand};
+use crate::{asm::Register, common::*, tac::{TacAutoGenLabel, TacLabelOperand}};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operand {
     VirtReg(usize),
     PhysReg(Register),
-    Imm(i64),
-    Frame(i32), // relative to fp/s8
+    Imm(Constant),
+    Frame(isize), // relative to fp/s8
+    Stack(isize), // relative to sp
     Static(StrDescriptor),
 }
 
@@ -17,9 +18,24 @@ pub enum Operand {
 pub enum Insn {
     Add(Operand, Operand, Operand),
     Addi(Operand, Operand, Operand),
+    Addw(Operand, Operand, Operand),
+    Addiw(Operand, Operand, Operand),
     Sub(Operand, Operand, Operand),
+    Subw(Operand, Operand, Operand),
+    Mul(Operand, Operand, Operand),
+    Mulw(Operand, Operand, Operand),
+    Div(Operand, Operand, Operand),
+    Divw(Operand, Operand, Operand),
+    Rem(Operand, Operand, Operand),
+    Remw(Operand, Operand, Operand),
     Slt(Operand, Operand, Operand),
-    Jmp(LabelOperand),
+    Sgt(Operand, Operand, Operand),
+    Seqz(Operand, Operand),
+    Snez(Operand, Operand),
+    Sextw(Operand, Operand),
+    Label(LabelOperand),
+    J(LabelOperand),
+    Jr(Operand),    // must be a register
     Beq(Operand, Operand, LabelOperand),
     Bne(Operand, Operand, LabelOperand),
     Call(StrDescriptor),
@@ -33,8 +49,26 @@ pub enum Insn {
     Li(Operand, i64),
     La(Operand, StrDescriptor),
     Neg(Operand, Operand),
+    Negw(Operand, Operand),
     Not(Operand, Operand),
+
+    Intermediate(IntermediateInsn),
 }
+
+/// Instructions that are used during the intermediate stages of code generation.
+/// These instructions are not emitted to the final assembly code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntermediateInsn {
+    Prologue,
+    Epilogue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelOperand {
+    AutoGen(usize),
+    Named(StrDescriptor),   
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Function {
@@ -63,9 +97,10 @@ pub struct BssSegment {
     pub items: Vec<StaticVar>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TopLevel {
     pub functions: HashMap<StrDescriptor, Function>,
     pub data_seg: DataSegment,
     pub bss_seg: BssSegment,
+    pub strtb: StringPool,
 }

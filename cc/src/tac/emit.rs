@@ -59,6 +59,7 @@ impl TopLevel {
         );
         output.push_str(&signature);
         output.push('\n');
+        output.push_str("code:\n");
         for insn in &func.body {
             let prefix = if let Insn::Label(..) = insn {
                 "".to_string()
@@ -70,17 +71,26 @@ impl TopLevel {
         }
         output.push_str("\n");
 
+        output.push_str("local vars:\n");
+        for (_, var) in &func.local_vars {
+            let name = self.strtb.get(var.name).unwrap();
+            output.push_str(&format!(
+                "\t{} %{}.{};\n",
+                var.data_type,
+                name,
+                var.local_id,
+            ));
+        }
+
+        output.push('\n');
+
         output
     }
 
     fn emit_insn(&self, insn: &Insn) -> String {
         match insn {
             Insn::Return(val) => {
-                let val_str = if let Some(operand) = val {
-                    self.emit_operand(operand)
-                } else {
-                    "".to_string()
-                };
+                let val_str = self.emit_operand(val);
                 format!("ret {}", val_str)
             },
             Insn::Unary {
@@ -119,9 +129,8 @@ impl TopLevel {
                     BinaryOp::LsEq => format!("lte\t{}, {}, {}", dst_str, left_str, right_str),
                     BinaryOp::Eq => format!("eq\t{}, {}, {}", dst_str, left_str, right_str),
                     BinaryOp::NotEq => format!("neq\t{}, {}, {}", dst_str, left_str, right_str),
-                    BinaryOp::And => format!("and\t{}, {}, {}", dst_str, left_str, right_str),
-                    BinaryOp::Or => format!("or\t{}, {}, {}", dst_str, left_str, right_str),
-                    BinaryOp::Assign => unreachable!(),
+                    BinaryOp::And => unreachable!(),
+                    BinaryOp::Or => unreachable!(),
                 }
             },
             Insn::FuncCall { target, args, dst } => {

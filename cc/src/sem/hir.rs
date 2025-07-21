@@ -107,6 +107,7 @@ pub struct StaticVar {
 pub struct Param {
     pub name: StrDescriptor,
     pub data_type: DataType,
+    pub local_id: usize,
 }
 
 impl Param {
@@ -115,14 +116,6 @@ impl Param {
     }
 }
 
-impl From<AstParam> for Param {
-    fn from(value: AstParam) -> Self {
-        Self {
-            name: value.name,
-            data_type: value.data_type,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct TypedExpr {
