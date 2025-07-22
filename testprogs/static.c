@@ -12,6 +12,8 @@ extern int x;
 int y;
 int y;
 extern int z;
+long w = 1;
+
 
 int b();
 
