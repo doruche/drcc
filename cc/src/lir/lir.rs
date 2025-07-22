@@ -69,6 +69,22 @@ pub enum LabelOperand {
     Named(StrDescriptor),   
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LabelSignature {
+    Tac {
+        func: StrDescriptor,
+        label: TacLabelOperand,
+    },   
+}
+
+impl LabelSignature {
+    pub fn from_tac(
+        func: StrDescriptor,
+        label: TacLabelOperand,
+    ) -> Self {
+        LabelSignature::Tac { func, label }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Function {

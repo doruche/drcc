@@ -13,6 +13,7 @@ use super::{
     BssSegment,
     Operand,
     LabelOperand,
+    LabelSignature,
     IntermediateInsn,
     Insn,
 };
@@ -21,6 +22,10 @@ use super::{
 pub struct CodeGen<Stage = Parse> {
     pub func_cxs: HashMap<StrDescriptor, FuncContext>,
     pub cur_func: Option<StrDescriptor>,
+    
+    pub next_label: usize,
+    pub lmap: HashMap<LabelSignature, usize>,
+
     pub _stage: PhantomData<Stage>,
 }
 
@@ -31,10 +36,7 @@ pub struct FuncContext {
 
     // following fields will be used through all stages.
     pub next_v_reg: usize,
-    pub next_label: usize,
     pub frame_size: usize,
-    // Map labels to their generated index
-    pub lmap: HashMap<usize, usize>,
     // Map temporary variables' id to virtual registers
     pub tmap: HashMap<usize, usize>,
     // Map variables' local id to virtual registers
@@ -49,9 +51,7 @@ impl FuncContext {
             name,
             type_,
             next_v_reg: 0,
-            next_label: 0,
             frame_size: 0,
-            lmap: HashMap::new(),
             tmap: HashMap::new(),
             vmap: HashMap::new(),
             mmap: HashMap::new(),
@@ -62,23 +62,6 @@ impl FuncContext {
         let v_reg = self.next_v_reg;
         self.next_v_reg += 1;
         v_reg
-    }
-
-    pub fn alloc_label(&mut self) -> usize {
-        let label = self.next_label;
-        self.next_label += 1;
-        label
-    }
-
-    pub fn map_label(&mut self, tac_label_id: usize, lir_label_id: usize) {
-        assert!(self.lmap.insert(tac_label_id, lir_label_id).is_none(),
-            "Label with id {} already mapped to a generated label",
-            tac_label_id
-        );
-    }
-
-    pub fn get_label(&self, label_id: usize) -> Option<usize> {
-        self.lmap.get(&label_id).copied()
     }
 
     pub fn map_temp2vreg(&mut self, temp_id: usize, v_reg: usize) {
@@ -129,7 +112,24 @@ impl CodeGen {
         CodeGen {
             func_cxs: HashMap::new(),
             cur_func: None,
+            next_label: 0,
+            lmap: HashMap::new(),
             _stage: PhantomData,
         }
+    }
+
+    pub fn next_label(&mut self) -> usize {
+        let label = self.next_label;
+        self.next_label += 1;
+        label
+    }
+
+    pub fn map_label(&mut self, signature: LabelSignature) -> usize {
+        if let Some(&label_id) = self.lmap.get(&signature) {
+            return label_id;
+        }
+        let label_id = self.next_label();
+        self.lmap.insert(signature, label_id);
+        label_id
     }
 }

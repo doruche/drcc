@@ -69,7 +69,7 @@ impl From<HirParam> for Param {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LabelOperand {
     AutoGen(AutoGenLabel),
     Named {
@@ -91,7 +91,7 @@ impl LabelOperand {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AutoGenLabel {
     Branch(usize),  // normal auto-generated label for branches and loops
     Continue(usize),

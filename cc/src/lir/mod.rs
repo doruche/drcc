@@ -15,6 +15,7 @@ use lir::{
     Insn,
     Function,
     LabelOperand,
+    LabelSignature,
     StaticVar,
     TopLevel,
     DataSegment,
@@ -68,6 +69,11 @@ mod tests {
     #[test]
     fn test_basic() {
         test_inner("../testprogs/basic.c");
+    }
+
+    #[test]
+    fn test_control_flow() {
+        test_inner("../testprogs/control_flow.c");
     }
 
     #[test]

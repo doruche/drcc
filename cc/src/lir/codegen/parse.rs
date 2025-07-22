@@ -24,6 +24,7 @@ use super::{
     Canonic,
     Parse,
     LabelOperand,
+    LabelSignature,
     TopLevel,  
     Function,
     StaticVar,
@@ -81,6 +82,8 @@ impl CodeGen<Parse> {
         }, CodeGen {
             func_cxs: self.func_cxs,
             cur_func: self.cur_func,
+            next_label: self.next_label,
+            lmap: self.lmap,
             _stage: PhantomData,
         })
     }
@@ -273,7 +276,11 @@ impl CodeGen<Parse> {
                 }
             },
             TacInsn::Jump(label) => {
-                let label_id = self.get_or_alloc_label(label.id());
+                let signature = LabelSignature::from_tac(
+                    self.cur_cx().name,
+                    label,
+                );
+                let label_id = self.map_label(signature);
                 vec![J(LabelOperand::AutoGen(label_id))]
             },
             TacInsn::BranchIfZero {
@@ -281,7 +288,11 @@ impl CodeGen<Parse> {
                 label 
             } => {
                 let (src_op, _) = self.parse_operand(src);
-                let label_id = self.get_or_alloc_label(label.id());
+                let signature = LabelSignature::from_tac(
+                    self.cur_cx().name,
+                    label,
+                );
+                let label_id = self.map_label(signature);
                 vec![Beq(src_op, Operand::PhysReg(Register::Zero), LabelOperand::AutoGen(label_id))]
             },
             TacInsn::BranchNotZero { 
@@ -289,11 +300,19 @@ impl CodeGen<Parse> {
                 label 
             } => {
                 let (src_op, _) = self.parse_operand(src);
-                let label_id = self.get_or_alloc_label(label.id());
+                let signature = LabelSignature::from_tac(
+                    self.cur_cx().name,
+                    label,
+                );
+                let label_id = self.map_label(signature);
                 vec![Bne(src_op, Operand::PhysReg(Register::Zero), LabelOperand::AutoGen(label_id))]
             },
             TacInsn::Label(label) => {
-                let label_id = self.get_or_alloc_label(label.id());
+                let signature = LabelSignature::from_tac(
+                    self.cur_cx().name,
+                    label,
+                );
+                let label_id = self.map_label(signature); 
                 vec![Label(LabelOperand::AutoGen(label_id))]
             },
             TacInsn::SignExt { src, dst } => {
@@ -301,11 +320,16 @@ impl CodeGen<Parse> {
                 let (dst_op, _) = self.parse_operand(dst);
                 vec![Sextw(dst_op, src_op)]
             },
-            TacInsn::Truncate {..} => {
+            TacInsn::Truncate { src, dst } => {
                 // actually no need to implement this,
                 // since if we need to operate on a smaller type,
                 // we just use according instructions, say, addw instead of add.
-                return None;
+                // however we have to insert a mv instruction as a placeholder,
+                // as we allocate a virtual register for the destination during tac generation.
+                // this instruction can be optimized out later.
+                let (src_op, _) = self.parse_operand(src);
+                let (dst_op, _) = self.parse_operand(dst);
+                vec![Mv(dst_op, src_op)]
             },
             TacInsn::FuncCall { 
                 target, 
@@ -315,11 +339,7 @@ impl CodeGen<Parse> {
                 let mut insns = vec![];
                 let (dst_op, dst_type) = self.parse_operand(dst);
                 let mut arg_ops = args.into_iter()
-                    .map(|arg| {
-                        let (op, type_) = self.parse_operand(arg);
-                        assert_eq!(type_, dst_type);
-                        (op, type_)
-                    })
+                    .map(|arg| self.parse_operand(arg))
                     .collect::<Vec<_>>();
                 for i in 0..8 {
                     if i < arg_ops.len() {
@@ -337,7 +357,7 @@ impl CodeGen<Parse> {
                         Operand::Imm(Constant::Long(-(padded_size as i64))),
                     ));
                     for (i, (op, type_)) in arg_ops.into_iter().enumerate().skip(8) {
-                        let offset = i * 8;
+                        let offset = (i - 8) * 8;
                         let insn = match type_.size() {
                             4 => Insn::Sw(op, Operand::Stack(offset as isize)),
                             8 => Insn::Sd(op, Operand::Stack(offset as isize)),
@@ -426,22 +446,6 @@ impl CodeGen<Parse> {
         v_reg
     }
 
-    fn alloc_label(&mut self) -> usize {
-        let cx = self.cur_cx_mut();
-        let label = cx.alloc_label();
-        label
-    }
-
-    fn get_or_alloc_label(&mut self, tac_label_id: usize) -> usize {
-        let cx = self.cur_cx_mut();
-        if let Some(lir_label_id) = cx.get_label(tac_label_id) {
-            lir_label_id
-        } else {
-            let lir_label_id = cx.alloc_label();
-            cx.map_label(tac_label_id, lir_label_id);
-            lir_label_id
-        }
-    }
 }
 
 fn get_functype(func: &TacFunction) -> FuncType {
