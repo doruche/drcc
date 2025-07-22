@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::marker::PhantomData;
 
 use crate::common::*;
 use crate::sem::{
@@ -19,6 +20,10 @@ use crate::sem::{
 };
 use super::{
     Operand,
+    Parse,
+    Opt,
+    FuncContext,
+    CodeGen,
     Insn,
     StaticVar,
     LocalVar,
@@ -31,24 +36,8 @@ use super::{
     AutoGenLabel,
 };
 
-#[derive(Debug, Clone)]
-pub struct FuncContext {
-    pub local_vars: HashMap<usize, LocalVar>,
-}
-
-#[derive(Debug)]
-pub struct CodeGen {
-    pub cur_cx: Option<FuncContext>,
-}
-
-impl CodeGen {
-    pub fn new() -> Self {
-        Self {
-            cur_cx: None,
-        }
-    }
-
-    pub fn parse(mut self, hir: HirTopLevel) -> Result<TopLevel> {
+impl CodeGen<Parse> {
+    pub fn parse(mut self, hir: HirTopLevel) -> (TopLevel, CodeGen<Opt>) {
         let mut functions = HashMap::new();
         let mut static_vars = HashMap::new();
         let strtb = hir.strtb;
@@ -84,7 +73,7 @@ impl CodeGen {
             let next_temp_id = &mut 0;
             let next_branch_label = &mut 0;
             for item in function.body.unwrap() {
-                let insn = self.parse_block_item(item, next_temp_id, next_branch_label)?;
+                let insn = self.parse_block_item(item, next_temp_id, next_branch_label);
                 func_insns.extend(insn);
             }
 
@@ -108,10 +97,13 @@ impl CodeGen {
             self.cur_cx = None;
         }
 
-        Ok(TopLevel {
+        (TopLevel {
             functions,
             static_vars,
             strtb,
+        }, CodeGen {
+            cur_cx: None,
+            _stage: PhantomData,
         })
     }
 
@@ -121,7 +113,7 @@ impl CodeGen {
         expr: HirTypedExpr, 
         next_temp_id: &mut usize,
         next_branch_label: &mut usize,
-    ) -> Result<(Operand, Option<Vec<Insn>>)> {
+    ) -> (Operand, Option<Vec<Insn>>) {
         let type_ = expr.type_;
         let expr = expr.untyped;
         let dst = Operand::Temp(*next_temp_id, type_);
@@ -130,12 +122,12 @@ impl CodeGen {
         match expr {
             HirExpr::Cast { target, expr, .. } => {
                 // now we only have int and long, so sext and trunc are enough
-                let (src_operand, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label)?;
+                let (src_operand, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label);
 
                 match (src_operand.data_type(), target) {
                     (a, b) if a == b => {
                         *next_temp_id -= 1;
-                        return Ok((src_operand, insns));
+                        return (src_operand, insns);
                     },
                     (DataType::Int, DataType::Long) => {
                         let insn = Insn::SignExt {
@@ -149,7 +141,7 @@ impl CodeGen {
                             },
                             None => vec![insn],
                         };
-                        return Ok((dst, Some(insns)));
+                        return (dst, Some(insns));
                     },
                     (DataType::Long, DataType::Int) => {
                         let insn = Insn::Truncate {
@@ -163,19 +155,16 @@ impl CodeGen {
                             },
                             None => vec![insn],
                         };
-                        return Ok((dst, Some(insns)));
+                        return (dst, Some(insns));
                     },
                     _ => unreachable!(),
                 }
-
-
-                todo!()
             },
             HirExpr::IntegerLiteral(val) => {
-                Ok((Operand::Imm(val), None))
+                (Operand::Imm(val), None)
             },
             HirExpr::Unary((op, span), expr) => {
-                let (src, mut insns) = self.parse_expr(*expr, next_temp_id, next_branch_label)?;
+                let (src, mut insns) = self.parse_expr(*expr, next_temp_id, next_branch_label);
                 let insn = Insn::Unary {
                     op: op.into(),
                     src,
@@ -188,7 +177,7 @@ impl CodeGen {
                     },
                     None => Some(vec![insn]),
                 };
-                Ok((dst, insns))
+                (dst, insns)
             }
             HirExpr::Group(inner) => {
                 self.parse_expr(*inner, next_temp_id, next_branch_label)
@@ -197,7 +186,7 @@ impl CodeGen {
                 let mut top_insns = vec![];
                 let mut arg_operands = vec![];
                 for arg in args {
-                    let (operand, insns) = self.parse_expr(arg, next_temp_id, next_branch_label)?;
+                    let (operand, insns) = self.parse_expr(arg, next_temp_id, next_branch_label);
                     if let Some(insns) = insns {
                         top_insns.extend(insns);
                     }
@@ -209,7 +198,7 @@ impl CodeGen {
                     dst,
                 };
                 top_insns.push(insn);
-                Ok((dst, Some(top_insns)))
+                (dst, Some(top_insns))
             },
             HirExpr::Binary { op: (op, ..), left, right } => {
                 let op = op.into();
@@ -221,7 +210,7 @@ impl CodeGen {
                         let end_lable = LabelOperand::AutoGen(AutoGenLabel::Branch(*next_branch_label + 1));
                         *next_branch_label += 2;
 
-                        let (left_operand, left_insns) = self.parse_expr(*left, next_temp_id, next_branch_label)?;
+                        let (left_operand, left_insns) = self.parse_expr(*left, next_temp_id, next_branch_label);
                         if let Some(left_insns) = left_insns {
                             top_insns.extend(left_insns);
                         }
@@ -237,7 +226,7 @@ impl CodeGen {
                             });
                         }
 
-                        let (right_operand, right_insns) = self.parse_expr(*right, next_temp_id, next_branch_label)?;
+                        let (right_operand, right_insns) = self.parse_expr(*right, next_temp_id, next_branch_label);
                         if let Some(right_insns) = right_insns {
                             top_insns.extend(right_insns);
                         }
@@ -278,12 +267,12 @@ impl CodeGen {
                             });
                         }
                         top_insns.push(Insn::Label(end_lable));
-                        Ok((dst, Some(top_insns)))
+                        (dst, Some(top_insns))
                     },
                     Add|Sub|Mul|Div|Rem|
                     Ls|Gt|GtEq|LsEq|Eq|NotEq => {
-                        let (left_operand, mut left_insns) = self.parse_expr(*left, next_temp_id, next_branch_label)?;
-                        let (right_operand, mut right_insns) = self.parse_expr(*right, next_temp_id, next_branch_label)?;
+                        let (left_operand, mut left_insns) = self.parse_expr(*left, next_temp_id, next_branch_label);
+                        let (right_operand, mut right_insns) = self.parse_expr(*right, next_temp_id, next_branch_label);
                         let insn = Insn::Binary {
                             op,
                             left: left_operand,
@@ -298,7 +287,7 @@ impl CodeGen {
                             insns.extend(right_insns);
                         }
                         insns.push(insn);
-                        Ok((dst, Some(insns)))
+                        (dst, Some(insns))
                     },
                 }
             },
@@ -313,7 +302,7 @@ impl CodeGen {
                             local_id: Some(local_id),
                             data_type,
                         };
-                        Ok((operand, None))
+                        (operand, None)
                     },
                     HirVariable::Static { name, data_type } => {
                         let operand = Operand::Var {
@@ -321,15 +310,15 @@ impl CodeGen {
                             local_id: None,
                             data_type,
                         };
-                        Ok((operand, None))
+                        (operand, None)
                     }
                 }
             },
             HirExpr::Assignment { span, left, right } => {
                 *next_temp_id -= 1;
 
-                let (left_operand, mut left_insns) = self.parse_expr(*left, next_temp_id, next_branch_label)?;
-                let (right_operand, mut right_insns) = self.parse_expr(*right, next_temp_id, next_branch_label)?;
+                let (left_operand, mut left_insns) = self.parse_expr(*left, next_temp_id, next_branch_label);
+                let (right_operand, mut right_insns) = self.parse_expr(*right, next_temp_id, next_branch_label);
 
                 let insn = Insn::Move {
                     src: right_operand,
@@ -344,7 +333,7 @@ impl CodeGen {
                     insns.extend(left_insns);
                 }
                 insns.push(insn);
-                Ok((left_operand, Some(insns)))
+                (left_operand, Some(insns))
             },
             HirExpr::Ternary { 
                 condition, 
@@ -353,7 +342,7 @@ impl CodeGen {
                 .. 
             } => {
                 let mut top_insns = vec![];
-                let (cond_operand, cond_insns) = self.parse_expr(*condition, next_temp_id, next_branch_label)?;
+                let (cond_operand, cond_insns) = self.parse_expr(*condition, next_temp_id, next_branch_label);
                 if let Some(cond_insns) = cond_insns {
                     top_insns.extend(cond_insns);
                 }
@@ -366,7 +355,7 @@ impl CodeGen {
                     src: cond_operand,
                     label: else_label,
                 });
-                let (then_operand, then_insns) = self.parse_expr(*then_expr, next_temp_id, next_branch_label)?;
+                let (then_operand, then_insns) = self.parse_expr(*then_expr, next_temp_id, next_branch_label);
                 if let Some(then_insns) = then_insns {
                     top_insns.extend(then_insns);
                 }
@@ -376,7 +365,7 @@ impl CodeGen {
                 });
                 top_insns.push(Insn::Jump(end_label));
                 top_insns.push(Insn::Label(else_label));
-                let (else_operand, else_insns) = self.parse_expr(*else_expr, next_temp_id, next_branch_label)?;
+                let (else_operand, else_insns) = self.parse_expr(*else_expr, next_temp_id, next_branch_label);
                 if let Some(else_insns) = else_insns {
                     top_insns.extend(else_insns);
                 }
@@ -385,7 +374,7 @@ impl CodeGen {
                     dst,
                 });
                 top_insns.push(Insn::Label(end_label));
-                Ok((dst, Some(top_insns)))
+                (dst, Some(top_insns))
             },
         }
     }
@@ -395,11 +384,11 @@ impl CodeGen {
         stmt: HirStmt, 
         next_temp_id: &mut usize,
         next_branch_label: &mut usize
-    ) -> Result<Vec<Insn>> {
+    ) -> Vec<Insn> {
         let mut top_insns = vec![];
         match stmt {
             HirStmt::Return { expr , ..} => {
-                let (operand, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label)?;
+                let (operand, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label);
                     let insn = Insn::Return(operand);
                     let insns = match insns {
                         Some(mut vec) => {
@@ -411,13 +400,13 @@ impl CodeGen {
                     top_insns.extend(insns);
             },
             HirStmt::Expr(expr) => {
-                let (operand, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label)?;
+                let (operand, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label);
                 if let Some(insns) = insns {
                     top_insns.extend(insns);
                 }
             },
             HirStmt::If { condition, then_branch, else_branch } => {
-                let (cond_operand, cond_insns) = self.parse_expr(*condition, next_temp_id, next_branch_label)?;
+                let (cond_operand, cond_insns) = self.parse_expr(*condition, next_temp_id, next_branch_label);
                 if let Some(cond_insns) = cond_insns {
                     top_insns.extend(cond_insns);
                 }
@@ -430,11 +419,11 @@ impl CodeGen {
                             src: cond_operand,
                             label: else_label,
                         });
-                        let then_insns = self.parse_stmt(*then_branch, next_temp_id, next_branch_label)?;
+                        let then_insns = self.parse_stmt(*then_branch, next_temp_id, next_branch_label);
                         top_insns.extend(then_insns);
                         top_insns.push(Insn::Jump(end_lable));
                         top_insns.push(Insn::Label(else_label));
-                        let else_insns = self.parse_stmt(*else_branch, next_temp_id, next_branch_label)?;
+                        let else_insns = self.parse_stmt(*else_branch, next_temp_id, next_branch_label);
                         top_insns.extend(else_insns);
                         top_insns.push(Insn::Label(end_lable));
                     },
@@ -445,7 +434,7 @@ impl CodeGen {
                             src: cond_operand,
                             label: end_lable,
                         });
-                        let then_insns = self.parse_stmt(*then_branch, next_temp_id, next_branch_label)?;
+                        let then_insns = self.parse_stmt(*then_branch, next_temp_id, next_branch_label);
                         top_insns.extend(then_insns);
                         top_insns.push(Insn::Label(end_lable));
                     }
@@ -453,7 +442,7 @@ impl CodeGen {
             },
             HirStmt::Compound(items) => {
                 for item in items {
-                    let insns = self.parse_block_item(item, next_temp_id, next_branch_label)?;
+                    let insns = self.parse_block_item(item, next_temp_id, next_branch_label);
                     top_insns.extend(insns);
                 }
             },
@@ -469,7 +458,7 @@ impl CodeGen {
                 let brk_label = LabelOperand::AutoGen(AutoGenLabel::Break(loop_label));
 
                 top_insns.push(Insn::Label(con_label));
-                let (ctrl_operand, ctrl_insns) = self.parse_expr(*controller, next_temp_id, next_branch_label)?;
+                let (ctrl_operand, ctrl_insns) = self.parse_expr(*controller, next_temp_id, next_branch_label);
                 if let Some(ctrl_insns) = ctrl_insns {
                     top_insns.extend(ctrl_insns);
                 }
@@ -477,7 +466,7 @@ impl CodeGen {
                     src: ctrl_operand,
                     label: brk_label,
                 });
-                let body_insns = self.parse_stmt(*body, next_temp_id, next_branch_label)?;
+                let body_insns = self.parse_stmt(*body, next_temp_id, next_branch_label);
                 top_insns.extend(body_insns);
                 top_insns.push(Insn::Jump(con_label));
                 top_insns.push(Insn::Label(brk_label));
@@ -489,10 +478,10 @@ impl CodeGen {
                 *next_branch_label += 1;
 
                 top_insns.push(Insn::Label(start_label));
-                let body_insns = self.parse_stmt(*body, next_temp_id, next_branch_label)?;
+                let body_insns = self.parse_stmt(*body, next_temp_id, next_branch_label);
                 top_insns.extend(body_insns);
                 top_insns.push(Insn::Label(con_label));
-                let (ctrl_operand, ctrl_insns) = self.parse_expr(*controller, next_temp_id, next_branch_label)?;
+                let (ctrl_operand, ctrl_insns) = self.parse_expr(*controller, next_temp_id, next_branch_label);
                 if let Some(ctrl_insns) = ctrl_insns {
                     top_insns.extend(ctrl_insns);
                 }
@@ -518,11 +507,11 @@ impl CodeGen {
                 if let Some(init) = initializer {
                     match *init {
                         HirForInit::Declaration(decl) => {
-                            let insns = self.parse_block_item(HirBlockItem::Declaration(decl), next_temp_id, next_branch_label)?;
+                            let insns = self.parse_block_item(HirBlockItem::Declaration(decl), next_temp_id, next_branch_label);
                             top_insns.extend(insns);
                         },
                         HirForInit::Expression(expr) => {
-                            let (_, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label)?;
+                            let (_, insns) = self.parse_expr(*expr, next_temp_id, next_branch_label);
                             if let Some(insns) = insns {
                                 top_insns.extend(insns);
                             }
@@ -531,7 +520,7 @@ impl CodeGen {
                 }
                 top_insns.push(Insn::Label(start_label));
                 if let Some(ctrl) = controller {
-                    let (ctrl_operand, ctrl_insns) = self.parse_expr(*ctrl, next_temp_id, next_branch_label)?;
+                    let (ctrl_operand, ctrl_insns) = self.parse_expr(*ctrl, next_temp_id, next_branch_label);
                     if let Some(ctrl_insns) = ctrl_insns {
                         top_insns.extend(ctrl_insns);
                     }
@@ -540,11 +529,11 @@ impl CodeGen {
                         label: brk_label,
                     });
                 }
-                let body_insns = self.parse_stmt(*body, next_temp_id, next_branch_label)?;
+                let body_insns = self.parse_stmt(*body, next_temp_id, next_branch_label);
                 top_insns.extend(body_insns);
                 top_insns.push(Insn::Label(con_label));
                 if let Some(post) = post {
-                    let (_, insns) = self.parse_expr(*post, next_temp_id, next_branch_label)?;
+                    let (_, insns) = self.parse_expr(*post, next_temp_id, next_branch_label);
                     if let Some(insns) = insns {
                         top_insns.extend(insns);
                     }
@@ -553,7 +542,7 @@ impl CodeGen {
                 top_insns.push(Insn::Label(brk_label));
             },
         }
-        Ok(top_insns)
+        top_insns
     }
 
     pub(super) fn parse_block_item(
@@ -561,7 +550,7 @@ impl CodeGen {
         item: HirBlockItem,
         next_temp_id: &mut usize,
         next_branch_label: &mut usize,
-    ) -> Result<Vec<Insn>> {
+    ) -> Vec<Insn> {
         match item {
             HirBlockItem::Declaration(local_var_decl) => {
                 let HirLocalVarDecl {
@@ -580,7 +569,7 @@ impl CodeGen {
 
                 let mut insns = vec![];
                 if let Some(expr) = initializer {
-                    let (src_operand, expr_insns) = self.parse_expr(expr, next_temp_id, next_branch_label)?;
+                    let (src_operand, expr_insns) = self.parse_expr(expr, next_temp_id, next_branch_label);
                     if let Some(expr_insns) = expr_insns {
                         insns.extend(expr_insns);
                     }
@@ -596,11 +585,10 @@ impl CodeGen {
                     data_type,
                 }).is_none());
 
-                Ok(insns)
+                insns
             },
             HirBlockItem::Statement(stmt) => self.parse_stmt(stmt, next_temp_id, next_branch_label),
         }
-
 
     }
 }

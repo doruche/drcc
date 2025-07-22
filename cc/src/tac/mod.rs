@@ -1,13 +1,13 @@
 //! Three-Address Code (TAC/MIR) module.
 //! HIR -> TAC
 
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, marker::PhantomData};
 
 mod codegen;
+mod opt;
 mod emit;
 mod tac;
 
-pub use codegen::CodeGen as TacCodeGen;
 pub use tac::{
     Operand as TacOperand,
     Insn as TacInsn,
@@ -21,6 +21,8 @@ pub use tac::{
     LabelOperand as TacLabelOperand,
     AutoGenLabel as TacAutoGenLabel,
 };
+pub use CodeGen as TacCodeGen;
+
 
 use tac::{
     Operand,
@@ -36,6 +38,31 @@ use tac::{
     AutoGenLabel,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Parse;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Opt;
+
+#[derive(Debug, Clone)]
+pub struct FuncContext {
+    pub local_vars: HashMap<usize, LocalVar>,
+}
+
+#[derive(Debug)]
+pub struct CodeGen<Stage = Parse> {
+    pub cur_cx: Option<FuncContext>,
+    _stage: PhantomData<Stage>,
+}
+
+impl CodeGen {
+    pub fn new() -> Self {
+        Self {
+            cur_cx: None,
+            _stage: PhantomData,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -59,17 +86,30 @@ mod tests {
         let mut parser = HirParser::new();
         let prog = parser.parse(prog).unwrap();
 
-        let mut parser = TacCodeGen::new();
-        let result = parser.parse(prog);
-        match result {
-            Ok(tac) => {
-                println!("{:#}", tac.emit_code());
-                println!("{:#}", tac.emit_static_vars());
-            }
-            Err(e) => {
-                eprintln!("Error: {}", e);
-            }
-        }
+        let mut parser = CodeGen::new();
+        let (tac, optimizer) = parser.parse(prog);
+        
+        println!("{:#}", tac.emit_code());
+        println!("{:#}", tac.emit_static_vars());
+    }
+
+    fn test_inner_with_opt(path: &str) {
+        let input = read_to_string(path).unwrap();
+        let mut lexer = Lexer::new(input.into());
+        let (tokens, strtb) = lexer.lex().unwrap();
+
+        let mut parser = AstParser::new(tokens, strtb);
+        let prog = parser.parse_prog().unwrap();
+        
+        let mut parser = HirParser::new();
+        let prog = parser.parse(prog).unwrap();
+
+        let mut codegen = CodeGen::new();
+        let (tac, optimizer) = codegen.parse(prog);
+        let opted_tac = optimizer.optimize(tac);
+
+        println!("{:#}", opted_tac.emit_code());
+        println!("{:#}", opted_tac.emit_static_vars());
     }
 
     #[test]
@@ -80,6 +120,11 @@ mod tests {
     #[test]
     fn test_var() {
         test_inner("../testprogs/var.c");
+    }
+
+    #[test]
+    fn test_basic_with_opt() {
+        test_inner_with_opt("../testprogs/basic.c");
     }
 
     #[test]
@@ -130,5 +175,10 @@ mod tests {
     #[test]
     fn test_reg() {
         test_inner("../testprogs/reg.c");
+    }
+
+    #[test]
+    fn test_reg_with_opt() {
+        test_inner_with_opt("../testprogs/reg.c");
     }
 }

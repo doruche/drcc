@@ -65,7 +65,7 @@ mod tests {
         let hir = parser.parse(ast).unwrap();
 
         let mut parser = TacCodeGen::new();
-        let tac = parser.parse(hir).unwrap();
+        let (tac, optimizer) = parser.parse(hir);
 
         let mut codegen_parse = CodeGen::new();
         let (lir, codegen_canonic) = codegen_parse.parse(tac);

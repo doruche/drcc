@@ -3,7 +3,7 @@ mod token;
 mod error;
 mod string_pool;
 
-use std::fmt::Display;
+use std::{fmt::Display, ops::{Add, Div, Mul, Rem, Sub}};
 
 pub use span::Span;
 pub use token::{RawToken, Token, TokenType};
@@ -100,6 +100,121 @@ impl Constant {
         match self {
             Constant::Int(value) => *value == 0,
             Constant::Long(value) => *value == 0,
+        }
+    }
+
+    pub fn neg(&self) -> Self {
+        match self {
+            Constant::Int(value) => Constant::Int(-value),
+            Constant::Long(value) => Constant::Long(-value),
+        }
+    }
+
+    pub fn complement(&self) -> Self {
+        match self {
+            Constant::Int(value) => Constant::Int(!value),
+            Constant::Long(value) => Constant::Long(!value),
+        }
+    }
+
+    pub fn not(&self) -> Self {
+        match self {
+            Constant::Int(value) => Constant::Int(
+                if value == &0 { 1 } else { 0 }
+            ),
+            Constant::Long(value) => Constant::Long(
+                if value == &0 { 1 } else { 0 }
+            ),
+        }
+    }
+}
+
+impl Add for Constant {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (Constant::Int(a), Constant::Int(b)) => Constant::Int(a.wrapping_add(b)),
+            (Constant::Long(a), Constant::Long(b)) => Constant::Long(a.wrapping_add(b)),
+            _ => panic!("Cannot add constants of different types"),
+        }
+    }
+}
+
+impl Sub for Constant {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (Constant::Int(a), Constant::Int(b)) => Constant::Int(a.wrapping_sub(b)),
+            (Constant::Long(a), Constant::Long(b)) => Constant::Long(a.wrapping_sub(b)),
+            _ => panic!("Cannot subtract constants of different types"),
+        }
+    }
+}
+
+impl Mul for Constant {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (Constant::Int(a), Constant::Int(b)) => Constant::Int(a.wrapping_mul(b)),
+            (Constant::Long(a), Constant::Long(b)) => Constant::Long(a.wrapping_mul(b)),
+            _ => panic!("Cannot multiply constants of different types"),
+        }
+    }
+}
+
+impl Div for Constant {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (Constant::Int(a), Constant::Int(b)) => {
+                if b == 0 {
+                    panic!("Division by zero");
+                }
+                Constant::Int(a.wrapping_div(b))
+            }
+            (Constant::Long(a), Constant::Long(b)) => {
+                if b == 0 {
+                    panic!("Division by zero");
+                }
+                Constant::Long(a.wrapping_div(b))
+            }
+            _ => panic!("Cannot divide constants of different types"),
+        }
+    }
+}
+
+impl Rem for Constant {
+    type Output = Self;
+
+    fn rem(self, other: Self) -> Self::Output {
+        match (self, other) {
+            (Constant::Int(a), Constant::Int(b)) => {
+                if b == 0 {
+                    panic!("Division by zero");
+                }
+                Constant::Int(a.wrapping_rem(b))
+            }
+            (Constant::Long(a), Constant::Long(b)) => {
+                if b == 0 {
+                    panic!("Division by zero");
+                }
+                Constant::Long(a.wrapping_rem(b))
+            }
+            _ => panic!("Cannot modulo constants of different types"),
+        }
+    }
+}
+
+impl PartialOrd for Constant {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Constant::Int(a), Constant::Int(b)) => a.partial_cmp(b),
+            (Constant::Long(a), Constant::Long(b)) => a.partial_cmp(b),
+            _ => None, // Different types cannot be compared
         }
     }
 }

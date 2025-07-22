@@ -63,7 +63,7 @@ impl Parser {
 
     fn unary(&mut self) -> Result<Expr> {
         if matches!(self.peek()?.get_type(),
-        TokenType::Hyphen|TokenType::Plus|TokenType::Tilde) {
+        TokenType::Hyphen|TokenType::Plus|TokenType::Tilde|TokenType::Bang) {
             let op_token = self.eat_current();
             let op = match op_token.get_type() {
                 TokenType::Hyphen => UnaryOp::Negate,
