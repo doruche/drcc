@@ -27,6 +27,14 @@ impl DataType {
         }
     }
 
+    pub fn align(&self) -> usize {
+        match self {
+            DataType::Int => 4,
+            DataType::Long => 8,
+            _ => panic!("Alignment not defined for this data type"),
+        }
+    }
+
     /// this always returns the super type of the two data types.
     /// if the two types are not compatible , it returns an error.
     pub fn common(&self, other: &DataType, span: Span) -> Result<DataType> {

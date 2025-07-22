@@ -109,7 +109,7 @@ impl Parser {
                     })
                 } else {
                     // grouping
-                    let expr = self.primary()?;
+                    let expr = self.expr_top_level()?;
                     self.eat(TokenType::RParen, "Expected ')' to close expression.")?;
                     Ok(Expr::Group(Box::new(expr)))
                 }

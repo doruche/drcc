@@ -12,6 +12,66 @@ use super::{
 };
 
 impl TopLevel {
+    pub fn emit(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&self.emit_code());
+        output.push_str(&self.emit_data());
+        output.push_str(&self.emit_bss());
+        output
+    }
+
+    pub fn emit_data(&self) -> String {
+        let mut output = String::new();
+        if self.data_seg.items.is_empty() {
+            return output;
+        }
+
+        output.push_str("\t.data\n");
+        for var in self.data_seg.items.iter() {
+            let name = self.strtb.get(var.name).unwrap();
+            if let Linkage::External = var.linkage {
+                output.push_str(&format!("\t.globl\t{}\n", name));
+            }
+            output.push_str(&format!("\t.align\t{}\n", var.data_type.align()));
+            output.push_str(&format!("\t.type\t{}, @object\n", name));
+            output.push_str(&format!("\t.size\t{}, {}\n", name, var.data_type.size()));
+            output.push_str(&format!("{}:\n", name));
+            let init_str = match var.initializer {
+                InitVal::Const(Constant::Int(i)) =>
+                    format!("\t.word\t{}\n", i),
+                InitVal::Const(Constant::Long(l)) =>
+                    format!("\t.dword\t{}\n", l),
+                InitVal::Tentative => unreachable!(), // these should be put in .bss segment
+                InitVal::None => unreachable!(),
+            };
+            output.push_str(&init_str);
+        }
+
+        output
+    }
+
+    pub fn emit_bss(&self) -> String {
+        let mut output = String::new();
+        if self.bss_seg.items.is_empty() {
+            return output;
+        }
+
+        output.push_str("\t.bss\n");
+        for var in self.bss_seg.items.iter() {
+            let name = self.strtb.get(var.name).unwrap();
+            if let Linkage::External = var.linkage {
+                output.push_str(&format!("\t.globl\t{}\n", name));
+            }
+            output.push_str(&format!("\t.align\t{}\n", var.data_type.align()));
+            output.push_str(&format!("\t.type\t{}, @object\n", name));
+            output.push_str(&format!("\t.size\t{}, {}\n", name, var.data_type.size()));
+            output.push_str(&format!("{}:\n", name));
+            output.push_str(&format!("\t.zero\t{}\n", var.data_type.size()));
+        }
+
+        output
+    }
+
     pub fn emit_code(&self) -> String {
         let mut output = String::new();
 
@@ -41,6 +101,8 @@ impl TopLevel {
             };
             output.push_str(&format!("{}{}\n", prefix, self.emit_insn(insn)));
         }
+
+        output.push_str(&format!("\t.size\t{}, .-{}\n", name, name));
 
         output
     }

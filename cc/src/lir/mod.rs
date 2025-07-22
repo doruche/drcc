@@ -1,9 +1,16 @@
 //! Low-Level Intermediate Representation (LIR) module
 //! TAC -> LIR
-//! In this module, we will:
-//! 1. Convert the three-address code (TAC) into a low-level intermediate representation (LIR).
-//! 2. Instruction canonicalization.
-//! 3. Register allocation.
+//! This stage includes following passes:
+//! 1. Convert the TAC code into an incomplete LIR.
+//! 2. Register allocation.
+//! 3. Instruction canonicalization.
+//! 4. Prologue/epilogue insertion.
+//! NOTE Since we start register allocation immediately after the LIR conversion, 
+//! we have to ensure not generating illegal instructions such as:
+//! 1. mv   a(mem1), b(mem2),
+//! 2. addi a(mem1), b(mem2), 0.
+//! We must break these instructions into simpler ones that only use virtual registers or physical registers.
+//! Otherwise, the register allocator will not be able to handle them correctly.
 
 mod lir;
 mod blocks;
@@ -63,7 +70,7 @@ mod tests {
         let mut codegen_parse = CodeGen::new();
         let (lir, codegen_canonic) = codegen_parse.parse(tac);
 
-        println!("{}", lir.emit_code());
+        println!("{}", lir.emit());
     }
 
     #[test]
@@ -79,5 +86,20 @@ mod tests {
     #[test]
     fn test_func() {
         test_inner("../testprogs/func.c");
+    }
+
+    #[test]
+    fn test_static() {
+        test_inner("../testprogs/static.c");
+    }
+
+    #[test]
+    fn test_cast() {
+        test_inner("../testprogs/cast.c");
+    }
+
+    #[test]
+    fn test_reg() {
+        test_inner("../testprogs/reg.c");
     }
 }

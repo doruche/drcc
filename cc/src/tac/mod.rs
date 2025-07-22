@@ -126,4 +126,9 @@ mod tests {
     fn test_cast() {
         test_inner("../testprogs/cast.c");
     }
+
+    #[test]
+    fn test_reg() {
+        test_inner("../testprogs/reg.c");
+    }
 }

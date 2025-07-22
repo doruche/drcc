@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
     Zero, Ra, Sp, Gp, Tp,
     T0, T1, T2, S0, S1,
@@ -102,5 +102,27 @@ impl Register {
             7 => Register::A7,
             _ => panic!("Internal error: Invalid A register ID: {}", id),
         }
+    }
+
+    pub fn is_caller_saved(&self) -> bool {
+        matches!(self, 
+            Register::T0 | Register::T1 | Register::T2 | 
+            Register::T3 | Register::T4 | Register::T5 | 
+            Register::T6 |
+            Register::A0 | Register::A1 | Register::A2 |
+            Register::A3 | Register::A4 | Register::A5 |
+            Register::A6 | Register::A7 |
+            Register::Ra
+        )
+    }
+
+    pub fn is_callee_saved(&self) -> bool {
+        matches!(self, 
+            Register::S0 | Register::S1 | Register::S2 |
+            Register::S3 | Register::S4 | Register::S5 |
+            Register::S6 | Register::S7 | Register::S8 |
+            Register::S9 | Register::S10 | Register::S11 |
+            Register::Sp
+        )
     }
 }

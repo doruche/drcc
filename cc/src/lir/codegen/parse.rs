@@ -136,14 +136,13 @@ impl CodeGen<Parse> {
         }
         insns.extend(parsed_body);
 
-         
-
         Function {
             name: func.name,
             linkage: func.linkage,
             func_type,
             body: insns,
             frame_size: 0, 
+            callee_saved: vec![],
         }
     }
 
@@ -350,7 +349,7 @@ impl CodeGen<Parse> {
 
                 if len > 8 {
                     let stack_size = (arg_ops.len() - 8) * 8;
-                    let padded_size = (stack_size + 7) & !7;
+                    let padded_size = (stack_size + 15) & !15;
                     insns.push(Insn::Addi(
                         Operand::PhysReg(Register::Sp),
                         Operand::PhysReg(Register::Sp),
@@ -372,7 +371,7 @@ impl CodeGen<Parse> {
 
                 if len > 8 {
                     let stack_size = (len - 8) * 8;
-                    let padded_size = (stack_size + 7) & !7;
+                    let padded_size = (stack_size + 15) & !15;
                     insns.push(Insn::Addi(
                         Operand::PhysReg(Register::Sp),
                         Operand::PhysReg(Register::Sp),

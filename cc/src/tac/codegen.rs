@@ -66,6 +66,7 @@ impl CodeGen {
         // functions
         for (name, function) in hir.funcs {
             if function.body.is_none() {
+                // TODO
                 continue;
             }
             
@@ -93,6 +94,7 @@ impl CodeGen {
             // 2. works fine, if the value is not used by the caller
             // hence, we insert a 'ret 0' instruction to make sure the standard is followed
             func_insns.push(Insn::Return(Operand::Imm(Constant::Int(0))));
+            
 
             functions.insert(name, Function {
                 return_type,

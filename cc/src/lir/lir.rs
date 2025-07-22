@@ -93,6 +93,9 @@ pub struct Function {
     pub func_type: FuncType,
     pub body: Vec<Insn>,
     pub frame_size: usize,
+
+    // processed during register allocation pass
+    pub callee_saved: Vec<Register>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
