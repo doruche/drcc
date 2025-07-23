@@ -1,16 +1,4 @@
 int
-main(int argc) {
-    int foo(void);
-    int foo(void);
-    foo();
-    {
-        int foo = 3;
-        foo = 4;
-    }
-    return 0;
-}
-
-int
 another(int a, int b) {
     int foo(void);
     {
@@ -38,4 +26,15 @@ int
 call_huge(void) {
     int val = huge(1, 2, 3, 4, 5, 6, 7, 8, 9L, 10, 0);
     return val;
+}
+
+int
+main(int argc) {
+    int foo(void);
+    int foo(void);
+    {
+        int foo = 3;
+        foo = 4;
+    }
+    return another(1, 3);
 }

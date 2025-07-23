@@ -44,6 +44,7 @@ impl CodeGen<Canonic> {
         &mut self,
         func: Function,
     ) -> Function {
+        let mut func = func;
         self.cur_func = Some(func.name);
 
         let c_insns = func.body.into_iter()
@@ -52,12 +53,9 @@ impl CodeGen<Canonic> {
 
         self.cur_func = None;
 
-        Function {
-            name: func.name,
-            linkage: func.linkage,
-            func_type: func.func_type,
-            body: c_insns,
-        }
+        func.body = c_insns;
+
+        func
     }
 
     fn canonic_insn(

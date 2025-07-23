@@ -44,6 +44,8 @@ impl CodeGen<Canonic> {
                     _ => unreachable!(),
                 }
             },
+            Add(dst, left, right) |
+            Addw(dst, left, right) |
             Sub(dst, left, right) |
             Subw(dst, left, right) |
             Mul(dst, left, right) |
@@ -59,6 +61,8 @@ impl CodeGen<Canonic> {
                 left_insn.map(|insn| insns.push(insn));
                 right_insn.map(|insn| insns.push(insn));
                 match insn {
+                    Add(..) => insns.push(Insn::Add(dst, left, right)),
+                    Addw(..) => insns.push(Insn::Addw(dst, left, right)),
                     Sub(..) => insns.push(Insn::Sub(dst, left, right)),
                     Subw(..) => insns.push(Insn::Subw(dst, left, right)),
                     Mul(..) => insns.push(Insn::Mul(dst, left, right)),
@@ -102,7 +106,7 @@ impl CodeGen<Canonic> {
             },
             Sd(src, mem) |
             Sw(src, mem) => {
-                assert!(matches!(mem, Operand::Frame(..)|Operand::Stack(..)));
+                assert!(matches!(mem, Operand::Mem{..}));
                 let (src, src_insn) = cimm_t5(src);
                 src_insn.map(|insn| insns.push(insn));
                 match insn {

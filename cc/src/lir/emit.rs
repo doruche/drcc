@@ -27,7 +27,7 @@ impl TopLevel {
         }
 
         output.push_str("\t.data\n");
-        for var in self.data_seg.items.iter() {
+        for (&name, var) in self.data_seg.items.iter() {
             let name = self.strtb.get(var.name).unwrap();
             if let Linkage::External = var.linkage {
                 output.push_str(&format!("\t.globl\t{}\n", name));
@@ -57,7 +57,7 @@ impl TopLevel {
         }
 
         output.push_str("\t.bss\n");
-        for var in self.bss_seg.items.iter() {
+        for (&name, var) in self.bss_seg.items.iter() {
             let name = self.strtb.get(var.name).unwrap();
             if let Linkage::External = var.linkage {
                 output.push_str(&format!("\t.globl\t{}\n", name));
@@ -159,8 +159,8 @@ impl TopLevel {
                 output.push_str(&format!("call\t{}", self.strtb.get(*name).unwrap())),
             LoadStatic(rd, name) => 
                 output.push_str(&format!("load_static\t{}, {}", self.emit_operand(rd), self.strtb.get(*name).unwrap())),
-            StoreStatic(name, rs) =>
-                output.push_str(&format!("store_static\t{}, {}", self.strtb.get(*name).unwrap(), self.emit_operand(rs))),
+            StoreStatic(rs, name) =>
+                output.push_str(&format!("store_static\t{}, {}", self.emit_operand(rs), self.strtb.get(*name).unwrap())),
             Ret =>
                 output.push_str("ret"),
             Lw(rd, mem) =>
@@ -199,8 +199,7 @@ impl TopLevel {
             VirtReg(id) => format!("v{}", id),
             PhysReg(reg) => format!("{}", reg),
             Imm(constant) => format!("{}", constant),
-            Frame(offset, ..) => format!("{}(s0)", offset),
-            Stack(offset, ..) => format!("{}(sp)", offset),
+            Mem{ base, offset, .. } => format!("{}({})", offset, base),
             Static(name, ..) => format!("{}", self.strtb.get(*name).unwrap()),
         }
     }

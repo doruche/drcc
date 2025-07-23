@@ -13,7 +13,6 @@
 //! Otherwise, the register allocator will not be able to handle them correctly.
 
 mod lir;
-mod blocks;
 mod codegen;
 mod emit;
 
@@ -27,17 +26,20 @@ use lir::{
     TopLevel,
     DataSegment,
     BssSegment,
-    IntermediateInsn,
 };
 
+pub use codegen::FuncContext as LirFuncContext;
+pub use codegen::CodeGen as LirCodeGen;
 pub use lir::{
     Operand as LirOperand,
     Insn as LirInsn,
     Function as LirFunction,
     StaticVar as LirStaticVar,
+    LabelOperand as LirLabelOperand,
     TopLevel as LirTopLevel,
     DataSegment as LirDataSegment,
     BssSegment as LirBssSegment,
+    IntermediateInsn,
 };
 
 #[cfg(test)]
@@ -74,9 +76,9 @@ mod tests {
         let lir = codegen_canonic.canonic(lir);
 
         // write to test file
-        // let output = lir.emit();
-        // let output_path = format!("{}.lir.S", path);
-        // std::fs::write(output_path, output).unwrap();
+        let output = lir.emit();
+        let output_path = format!("{}.lir.S", path);
+        std::fs::write(output_path, output).unwrap();
     }
 
     #[test]

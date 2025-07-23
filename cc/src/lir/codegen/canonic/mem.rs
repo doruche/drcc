@@ -111,18 +111,18 @@ impl CodeGen<Canonic> {
                 }
 
             },
-            Insn::StoreStatic(name, src) => {
+            Insn::StoreStatic(src, name) => {
                 let (src, src_insn) = cmem_r_t5(src);
 
                 if let Some(insn) = src_insn {
                     insns.push(insn);
                 }
 
-                insns.push(Insn::StoreStatic(name, src));
+                insns.push(Insn::StoreStatic(src, name));
             },
             Insn::Ld(dst, mem) |
             Insn::Lw(dst, mem) => {
-                assert!(matches!(mem, Operand::Stack(..)|Operand::Frame(..)));
+                assert!(matches!(mem, Operand::Mem{..}));
                 let (dst, dst_insn) = cmem_w_t5(dst);
 
                 insns.push(match insn {
@@ -137,7 +137,7 @@ impl CodeGen<Canonic> {
             },
             Insn::Sd(src, mem) |
             Insn::Sw(src, mem) => {
-                assert!(matches!(mem, Operand::Stack(..)|Operand::Frame(..)));
+                assert!(matches!(mem, Operand::Mem{..}));
                 let (src, src_insn) = cmem_r_t5(src);
 
                 if let Some(insn) = src_insn {
@@ -195,21 +195,13 @@ impl CodeGen<Canonic> {
 
 fn cmem_r_t5(operand: Operand) -> (Operand, Option<Insn>) {
     match operand {
-        Operand::Frame(offset, size) => (
+        Operand::Mem { base, offset, size } => (
             Operand::PhysReg(Register::T5),
             match size {
-                4 => Some(Insn::Lw(Operand::PhysReg(Register::T5), Operand::Frame(offset, size))),
-                8 => Some(Insn::Ld(Operand::PhysReg(Register::T5), Operand::Frame(offset, size))),
+                4 => Some(Insn::Lw(Operand::PhysReg(Register::T5), Operand::Mem { base, offset, size })),
+                8 => Some(Insn::Ld(Operand::PhysReg(Register::T5), Operand::Mem { base, offset, size })),
                 _ => unreachable!(),
-            }
-        ),
-        Operand::Stack(offset, size) => (
-            Operand::PhysReg(Register::T5),
-            match size {
-                4 => Some(Insn::Lw(Operand::PhysReg(Register::T5), Operand::Stack(offset, size))),
-                8 => Some(Insn::Ld(Operand::PhysReg(Register::T5), Operand::Stack(offset, size))),
-                _ => unreachable!(),
-            }
+            }  
         ),
         Operand::Static(name) => (
             Operand::PhysReg(Register::T5),
@@ -221,19 +213,11 @@ fn cmem_r_t5(operand: Operand) -> (Operand, Option<Insn>) {
 
 fn cmem_r_t6(operand: Operand) -> (Operand, Option<Insn>) {
     match operand {
-        Operand::Frame(offset, size) => (
+        Operand::Mem { base, offset, size } => (
             Operand::PhysReg(Register::T6),
             match size {
-                4 => Some(Insn::Lw(Operand::PhysReg(Register::T6), Operand::Frame(offset, size))),
-                8 => Some(Insn::Ld(Operand::PhysReg(Register::T6), Operand::Frame(offset, size))),
-                _ => unreachable!(),
-            }
-        ),
-        Operand::Stack(offset, size) => (
-            Operand::PhysReg(Register::T6),
-            match size {
-                4 => Some(Insn::Lw(Operand::PhysReg(Register::T6), Operand::Stack(offset, size))),
-                8 => Some(Insn::Ld(Operand::PhysReg(Register::T6), Operand::Stack(offset, size))),
+                4 => Some(Insn::Lw(Operand::PhysReg(Register::T6), Operand::Mem { base, offset, size })),
+                8 => Some(Insn::Ld(Operand::PhysReg(Register::T6), Operand::Mem { base, offset, size })),
                 _ => unreachable!(),
             }
         ),
@@ -247,25 +231,21 @@ fn cmem_r_t6(operand: Operand) -> (Operand, Option<Insn>) {
 
 fn cmem_w_t5(operand: Operand) -> (Operand, Option<Insn>) {
     match operand {
-        Operand::Frame(offset, size) => (
+        Operand::Mem {
+            base,
+            offset,
+            size,
+        } => (
             Operand::PhysReg(Register::T5),
             match size {
-                4 => Some(Insn::Sw(Operand::PhysReg(Register::T5), Operand::Frame(offset, size))),
-                8 => Some(Insn::Sd(Operand::PhysReg(Register::T5), Operand::Frame(offset, size))),
-                _ => unreachable!(),
-            }
-        ),
-        Operand::Stack(offset, size) => (
-            Operand::PhysReg(Register::T5),
-            match size {
-                4 => Some(Insn::Sw(Operand::PhysReg(Register::T5), Operand::Stack(offset, size))),
-                8 => Some(Insn::Sd(Operand::PhysReg(Register::T5), Operand::Stack(offset, size))),
+                4 => Some(Insn::Sw(Operand::PhysReg(Register::T5), Operand::Mem { base, offset, size })),
+                8 => Some(Insn::Sd(Operand::PhysReg(Register::T5), Operand::Mem { base, offset, size })),
                 _ => unreachable!(),
             }
         ),
         Operand::Static(name) => (
             Operand::PhysReg(Register::T5),
-            Some(Insn::StoreStatic(name, Operand::PhysReg(Register::T5))),
+            Some(Insn::StoreStatic(Operand::PhysReg(Register::T5), name))
         ),
         _ => (operand, None),
     }

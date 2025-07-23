@@ -7,9 +7,30 @@ pub enum Operand {
     VirtReg(usize),
     PhysReg(Register),
     Imm(i64),
-    Frame(isize, usize), // relative to fp/s8
-    Stack(isize, usize), // relative to sp
+    Mem {
+        base: Register,
+        offset: isize,
+        size: usize,
+    },
     Static(StrDescriptor),
+}
+
+impl Operand {
+    pub fn frame(offset: isize, size: usize) -> Self {
+        Operand::Mem {
+            base: Register::S0,
+            offset,
+            size,
+        }
+    }
+
+    pub fn stack(offset: isize, size: usize) -> Self {
+        Operand::Mem {
+            base: Register::Sp,
+            offset,
+            size,
+        }
+    }
 }
 
 /// Some instructions' usage may overlap with others. (e.g. addi t0, t1, 0 vs. mv t0, t1)
@@ -51,7 +72,7 @@ pub enum Insn {
     Not(Operand, Operand),
 
     LoadStatic(Operand, StrDescriptor),
-    StoreStatic(StrDescriptor, Operand),
+    StoreStatic(Operand, StrDescriptor),
 
     Intermediate(IntermediateInsn),
 }
@@ -93,6 +114,8 @@ pub struct Function {
     pub linkage: Linkage,
     pub func_type: FuncType,
     pub body: Vec<Insn>,
+    pub frame_size: usize,
+    pub callee_saved: Option<Vec<(Register, isize)>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,12 +128,12 @@ pub struct StaticVar {
 
 #[derive(Debug, Clone)]
 pub struct DataSegment {
-    pub items: Vec<StaticVar>,
+    pub items: HashMap<StrDescriptor, StaticVar>,
 }
 
 #[derive(Debug, Clone)]
 pub struct BssSegment {
-    pub items: Vec<StaticVar>,
+    pub items: HashMap<StrDescriptor, StaticVar>,
 }
 
 #[derive(Debug)]
@@ -119,4 +142,24 @@ pub struct TopLevel {
     pub data_seg: DataSegment,
     pub bss_seg: BssSegment,
     pub strtb: StringPool,
+}
+
+impl DataSegment {
+    pub fn new() -> Self {
+        DataSegment { items: HashMap::new() }
+    }
+
+    pub fn add(&mut self, var: StaticVar) {
+        self.items.insert(var.name, var);
+    }
+}
+
+impl BssSegment {
+    pub fn new() -> Self {
+        BssSegment { items: HashMap::new() }
+    }
+
+    pub fn add(&mut self, var: StaticVar) {
+        self.items.insert(var.name, var);
+    }
 }

@@ -45,7 +45,8 @@ pub struct FuncContext {
     // Map spilled virtual registers to frame offsets
     pub mmap: HashMap<usize, isize>,
     // registers that need to be saved across function calls
-    pub callee_saved: Vec<Register>,
+    // (register, frame_offset)
+    pub callee_saved: Option<Vec<(Register, isize)>>,
 }
 
 impl FuncContext {
@@ -54,11 +55,11 @@ impl FuncContext {
             name,
             type_,
             next_v_reg: 0,
-            frame_size: 0,
+            frame_size: 16,
             tmap: HashMap::new(),
             vmap: HashMap::new(),
             mmap: HashMap::new(),
-            callee_saved: vec![],
+            callee_saved: Some(vec![(Register::S0, -16), (Register::Ra, -8)]),
         }
     }
 

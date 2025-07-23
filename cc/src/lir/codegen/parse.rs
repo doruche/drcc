@@ -52,11 +52,11 @@ impl CodeGen<Parse> {
             };
             match var.initializer {
                 InitVal::Tentative => 
-                    bss_seg.items.push(static_var),
+                    bss_seg.add(static_var),
                 InitVal::Const(c) if c.is_zero() =>
-                    bss_seg.items.push(static_var),
+                    bss_seg.add(static_var),
                 InitVal::Const(_) =>
-                    data_seg.items.push(static_var),
+                    data_seg.add(static_var),
                 InitVal::None => {},
             }
         }
@@ -117,8 +117,8 @@ impl CodeGen<Parse> {
                 let offset = get_param_offset(&func.params, i);
                 // currenly we only have int and long, and no needs to consider the sign.
                 let insn = match size {
-                    4 => Insn::Lw(v_reg, Operand::Frame(offset, 4)),
-                    8 => Insn::Ld(v_reg, Operand::Frame(offset, 8)),
+                    4 => Insn::Lw(v_reg, Operand::frame(offset, 4)),
+                    8 => Insn::Ld(v_reg, Operand::frame(offset, 8)),
                     _ => unreachable!(),
                 };
                 insns.push(insn);
@@ -141,6 +141,8 @@ impl CodeGen<Parse> {
             linkage: func.linkage,
             func_type,
             body: insns,
+            frame_size: 0,
+            callee_saved: None,
         }
     }
 
@@ -356,8 +358,8 @@ impl CodeGen<Parse> {
                     for (i, (op, type_)) in arg_ops.into_iter().enumerate().skip(8) {
                         let offset = (i - 8) * 8;
                         let insn = match type_.size() {
-                            4 => Insn::Sw(op, Operand::Stack(offset as isize, 4)),
-                            8 => Insn::Sd(op, Operand::Stack(offset as isize, 4)),
+                            4 => Insn::Sw(op, Operand::stack(offset as isize, 4)),
+                            8 => Insn::Sd(op, Operand::stack(offset as isize, 8)),
                             _ => unreachable!(),
                         };
                         insns.push(insn);

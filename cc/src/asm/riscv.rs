@@ -1,4 +1,13 @@
+use std::collections::HashMap;
 use std::fmt::Display;
+use crate::common::*;
+use crate::lir::{
+    LirFunction,
+    LirBssSegment,
+    LirDataSegment,
+    LirStaticVar,
+    LirLabelOperand,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
@@ -125,4 +134,131 @@ impl Register {
             Register::Sp
         )
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Insn {
+    Add(Register, Register, Register),
+    Addi(Register, Register, i64),
+    Addw(Register, Register, Register),
+    Addiw(Register, Register, i32),
+    Sub(Register, Register, Register),
+    Subw(Register, Register, Register),
+    Mul(Register, Register, Register),
+    Mulw(Register, Register, Register),
+    Div(Register, Register, Register),
+    Divw(Register, Register, Register),
+    Rem(Register, Register, Register),
+    Remw(Register, Register, Register),
+
+    Neg(Register, Register),
+    Negw(Register, Register),
+    Not(Register, Register), 
+    Seqz(Register, Register),
+    Snez(Register, Register),
+    Sextw(Register, Register),
+    Mv(Register, Register),
+
+    Call(StrDescriptor),
+    Beq(Register, Register, LabelOperand),
+    Bne(Register, Register, LabelOperand),
+    J(LabelOperand),
+    Label(LabelOperand),
+    Ret,
+
+    Slt(Register, Register, Register),
+    Sgt(Register, Register, Register),
+
+
+    Ld(Register, Register, isize),
+    Lw(Register, Register, isize),
+    Sd(Register, Register, isize),
+    Sw(Register, Register, isize),
+
+    Li(Register, i64),
+    La(Register, StrDescriptor),
+
+    LoadStatic(Register, StrDescriptor),
+    StoreStatic(Register, StrDescriptor),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LabelOperand {
+    AutoGen(usize),
+    Named(StrDescriptor),
+}
+
+impl From<LirLabelOperand> for LabelOperand {
+    fn from(label: LirLabelOperand) -> Self {
+        match label {
+            LirLabelOperand::AutoGen(id) => LabelOperand::AutoGen(id),
+            LirLabelOperand::Named(name) => LabelOperand::Named(name),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StaticVar {
+    pub name: StrDescriptor,
+    pub data_type: DataType,
+    pub linkage: Linkage,
+    pub initializer: InitVal,
+}
+
+impl From<LirStaticVar> for StaticVar {
+    fn from(var: LirStaticVar) -> Self {
+        StaticVar {
+            name: var.name,
+            data_type: var.data_type,
+            linkage: var.linkage,
+            initializer: var.initializer,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DataSegment {
+    pub items: HashMap<StrDescriptor, StaticVar>,
+}
+
+#[derive(Debug)]
+pub struct BssSegment {
+    pub items: HashMap<StrDescriptor, StaticVar>,
+}
+
+impl DataSegment {
+    pub fn new() -> Self {
+        DataSegment { items: HashMap::new() }
+    }
+
+    pub fn add(&mut self, var: StaticVar) {
+        self.items.insert(var.name, var);
+    }
+}
+
+impl BssSegment {
+    pub fn new() -> Self {
+        BssSegment { items: HashMap::new() }
+    }
+
+    pub fn add(&mut self, var: StaticVar) {
+        self.items.insert(var.name, var);
+    }
+}
+
+#[derive(Debug)]
+pub struct Function {
+    pub name: StrDescriptor,
+    pub func_type: FuncType,
+    pub body: Vec<Insn>,
+    pub linkage: Linkage,
+}
+
+
+#[derive(Debug)]
+pub struct TopLevel {
+    pub functions: HashMap<StrDescriptor, Function>,
+    pub data_seg: DataSegment,
+    pub bss_seg: BssSegment,
+    pub strtb: StringPool,    
 }

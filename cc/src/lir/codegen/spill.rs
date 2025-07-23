@@ -42,6 +42,7 @@ impl CodeGen<Spill> {
         &mut self,
         func: Function,
     ) -> Function {
+        let mut func = func;
         self.cur_func = Some(func.name);
 
         let s_insns = func.body.into_iter()
@@ -52,14 +53,15 @@ impl CodeGen<Spill> {
         let cx = self.cur_cx_mut();
         cx.frame_size = (cx.frame_size + 15) / 16 * 16;
 
+        // We won't further use these fields in FuncContext anymore.
+        func.body = s_insns;
+        func.frame_size = cx.frame_size;
+        func.callee_saved = cx.callee_saved.take();
+
+
         self.cur_func = None;
 
-        Function {
-            name: func.name,
-            linkage: func.linkage,
-            func_type: func.func_type,
-            body: s_insns,
-        }
+        func        
     }
 
     fn spill_insn(
@@ -226,7 +228,7 @@ impl CodeGen<Spill> {
         match operand {
             Operand::VirtReg(v_reg_id) => {
                 let offset = self.spill_vreg(v_reg_id);
-                Operand::Frame(offset, size)
+                Operand::frame(offset, size)
             },
             _ => operand,
         }
