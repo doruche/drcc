@@ -68,7 +68,9 @@ mod tests {
         let (tac, optimizer) = parser.parse(hir);
 
         let mut codegen_parse = CodeGen::new();
-        let (lir, codegen_canonic) = codegen_parse.parse(tac);
+        let (lir, codegen_regalloc) = codegen_parse.parse(tac);
+        let (lir, codegen_spill) = codegen_regalloc.alloc(lir);
+        let (lir, codegen_canonic) = codegen_spill.spill(lir);
 
         println!("{}", lir.emit());
     }

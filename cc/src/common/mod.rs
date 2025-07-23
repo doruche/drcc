@@ -89,6 +89,13 @@ pub enum Constant {
 }
 
 impl Constant {
+    pub fn value(&self) -> i64 {
+        match self {
+            Constant::Int(value) => *value as i64,
+            Constant::Long(value) => *value,
+        }
+    }
+
     pub fn data_type(&self) -> DataType {
         match self {
             Constant::Int(_) => DataType::Int,

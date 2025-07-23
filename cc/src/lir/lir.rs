@@ -17,9 +17,9 @@ pub enum Operand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Insn {
     Add(Operand, Operand, Operand),
-    Addi(Operand, Operand, Operand),
+    Addi(Operand, Operand, i64),
     Addw(Operand, Operand, Operand),
-    Addiw(Operand, Operand, Operand),
+    Addiw(Operand, Operand, i32),
     Sub(Operand, Operand, Operand),
     Subw(Operand, Operand, Operand),
     Mul(Operand, Operand, Operand),
@@ -44,7 +44,6 @@ pub enum Insn {
     Sw(Operand, Operand),
     Ld(Operand, Operand),
     Sd(Operand, Operand),
-    Ldu(Operand, Operand),
     Mv(Operand, Operand),
     Li(Operand, i64),
     La(Operand, StrDescriptor),
@@ -52,11 +51,14 @@ pub enum Insn {
     Negw(Operand, Operand),
     Not(Operand, Operand),
 
+    LoadStatic(Operand, StrDescriptor),
+    StoreStatic(StrDescriptor, Operand),
+
     Intermediate(IntermediateInsn),
 }
 
 /// Instructions that are used during the intermediate stages of code generation.
-/// These instructions are not emitted to the final assembly code.
+/// When lir is finally emitted, these instructions will be replaced with prologue/epilogue instructions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IntermediateInsn {
     Prologue,
@@ -92,10 +94,6 @@ pub struct Function {
     pub linkage: Linkage,
     pub func_type: FuncType,
     pub body: Vec<Insn>,
-    pub frame_size: usize,
-
-    // processed during register allocation pass
-    pub callee_saved: Vec<Register>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

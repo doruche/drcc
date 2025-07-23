@@ -1,10 +1,11 @@
 mod parse;
-mod canonic;
 mod regalloc;
+mod spill;
+mod canonic;
 
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{common::*, tac::TacLabelOperand};
+use crate::{asm::Register, common::*, tac::TacLabelOperand};
 use super::{
     TopLevel,
     Function,
@@ -41,8 +42,10 @@ pub struct FuncContext {
     pub tmap: HashMap<usize, usize>,
     // Map variables' local id to virtual registers
     pub vmap: HashMap<usize, usize>,
-    // Map spilled virtual registers or variables to frame offsets
+    // Map spilled virtual registers to frame offsets
     pub mmap: HashMap<usize, isize>,
+    // registers that need to be saved across function calls
+    pub callee_saved: Vec<Register>,
 }
 
 impl FuncContext {
@@ -55,6 +58,7 @@ impl FuncContext {
             tmap: HashMap::new(),
             vmap: HashMap::new(),
             mmap: HashMap::new(),
+            callee_saved: vec![],
         }
     }
 
@@ -62,6 +66,13 @@ impl FuncContext {
         let v_reg = self.next_v_reg;
         self.next_v_reg += 1;
         v_reg
+    }
+
+    pub fn map_vreg2frame(&mut self, v_reg: usize, offset: isize) {
+        assert!(self.mmap.insert(v_reg, offset).is_none(),
+            "Virtual register {} already mapped to memory offset {}",
+            v_reg, offset
+        );
     }
 
     pub fn map_temp2vreg(&mut self, temp_id: usize, v_reg: usize) {
@@ -78,13 +89,6 @@ impl FuncContext {
         );
     }
 
-    pub fn map_vreg2mem(&mut self, v_reg: usize, offset: isize) {
-        assert!(self.mmap.insert(v_reg, offset).is_none(),
-            "Virtual register {} already mapped to memory offset {}",
-            v_reg, offset
-        );
-    }
-
     pub fn temp_vreg(&self, temp_id: usize) -> Option<usize> {
         self.tmap.get(&temp_id).copied()
     }
@@ -92,20 +96,20 @@ impl FuncContext {
     pub fn var_vreg(&self, local_id: usize) -> Option<usize> {
         self.vmap.get(&local_id).copied()
     }
-
-    pub fn alloc_frame(&mut self, size: usize) {
-        self.frame_size += size;
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parse;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Canonic;
+pub struct RegAlloc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RegAlloc;
+pub struct Spill;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Canonic;
+
 
 impl CodeGen {
     pub fn new() -> Self {
@@ -117,19 +121,20 @@ impl CodeGen {
             _stage: PhantomData,
         }
     }
+}
 
-    pub fn next_label(&mut self) -> usize {
-        let label = self.next_label;
-        self.next_label += 1;
-        label
+impl<Stage> CodeGen<Stage> {
+    fn cur_cx(&self) -> &FuncContext {
+        self.cur_func
+            .as_ref()
+            .and_then(|name| self.func_cxs.get(name))
+            .expect("Internal error: Current function context not found")
     }
 
-    pub fn map_label(&mut self, signature: LabelSignature) -> usize {
-        if let Some(&label_id) = self.lmap.get(&signature) {
-            return label_id;
-        }
-        let label_id = self.next_label();
-        self.lmap.insert(signature, label_id);
-        label_id
+    fn cur_cx_mut(&mut self) -> &mut FuncContext {
+        self.cur_func
+            .as_ref()
+            .and_then(|name| self.func_cxs.get_mut(name))
+            .expect("Internal error: Current function context not found")
     }
 }

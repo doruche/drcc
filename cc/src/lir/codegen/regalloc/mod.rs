@@ -5,6 +5,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{asm::Register, common::*};
 use super::{
+    CodeGen,
+    RegAlloc,
+    Canonic,
+    Spill,
     TopLevel,
     Function,
     Insn,
@@ -12,6 +16,7 @@ use super::{
 };
 
 mod rig;
+mod alloc;
 
 /// Register interference graph, per function.
 #[derive(Debug)]

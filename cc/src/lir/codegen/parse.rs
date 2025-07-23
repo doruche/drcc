@@ -21,7 +21,7 @@ use crate::tac::{
 use super::{
     CodeGen,
     FuncContext,
-    Canonic,
+    RegAlloc,
     Parse,
     LabelOperand,
     LabelSignature,
@@ -36,7 +36,7 @@ use super::{
 };
 
 impl CodeGen<Parse> {
-    pub fn parse(mut self, tac: TacTopLevel) -> (TopLevel, CodeGen<Canonic>) {
+    pub fn parse(mut self, tac: TacTopLevel) -> (TopLevel, CodeGen<RegAlloc>) {
         let mut functions = HashMap::new();
         let mut data_seg = DataSegment::new();
         let mut bss_seg = BssSegment::new();
@@ -87,6 +87,8 @@ impl CodeGen<Parse> {
             _stage: PhantomData,
         })
     }
+
+
 }
 
 impl CodeGen<Parse> {
@@ -102,8 +104,6 @@ impl CodeGen<Parse> {
             .as_ref()
             .and_then(|name| self.func_cxs.get_mut(name))
             .expect("Internal error: Current function context not found");
-
-        // prologue
 
         insns.push(Insn::Intermediate(IntermediateInsn::Prologue));
 
@@ -141,8 +141,6 @@ impl CodeGen<Parse> {
             linkage: func.linkage,
             func_type,
             body: insns,
-            frame_size: 0, 
-            callee_saved: vec![],
         }
     }
 
@@ -160,7 +158,11 @@ impl CodeGen<Parse> {
             TacInsn::Move { src, dst } => {
                 let (src_op, _) = self.parse_operand(src);
                 let (dst_op, _) = self.parse_operand(dst);
-                vec![Mv(dst_op, src_op)]
+                if let Operand::Imm(constant) = src_op {
+                    vec![Li(dst_op, constant.value())]
+                } else {
+                    vec![Mv(dst_op, src_op)]
+                }
             },
             TacInsn::Return(val) => {
                 let (val_op, _) = self.parse_operand(val);
@@ -353,7 +355,7 @@ impl CodeGen<Parse> {
                     insns.push(Insn::Addi(
                         Operand::PhysReg(Register::Sp),
                         Operand::PhysReg(Register::Sp),
-                        Operand::Imm(Constant::Long(-(padded_size as i64))),
+                        -(padded_size as i64),
                     ));
                     for (i, (op, type_)) in arg_ops.into_iter().enumerate().skip(8) {
                         let offset = (i - 8) * 8;
@@ -375,7 +377,7 @@ impl CodeGen<Parse> {
                     insns.push(Insn::Addi(
                         Operand::PhysReg(Register::Sp),
                         Operand::PhysReg(Register::Sp),
-                        Operand::Imm(Constant::Long(padded_size as i64)),
+                        padded_size as i64,
                     ));
                 }
 
@@ -425,24 +427,25 @@ impl CodeGen<Parse> {
         (op, operand.data_type())
     }
 
-    fn cur_cx(&self) -> &FuncContext {
-        self.cur_func
-            .as_ref()
-            .and_then(|name| self.func_cxs.get(name))
-            .expect("Internal error: Current function context not found")
-    }
-
-    fn cur_cx_mut(&mut self) -> &mut FuncContext {
-        self.cur_func
-            .as_ref()
-            .and_then(|name| self.func_cxs.get_mut(name))
-            .expect("Internal error: Current function context not found")
-    }
-
     fn alloc_v_reg(&mut self) -> usize {
         let cx = self.cur_cx_mut();
         let v_reg = cx.alloc_v_reg();
         v_reg
+    }
+
+    pub fn next_label(&mut self) -> usize {
+        let label = self.next_label;
+        self.next_label += 1;
+        label
+    }
+
+    pub fn map_label(&mut self, signature: LabelSignature) -> usize {
+        if let Some(&label_id) = self.lmap.get(&signature) {
+            return label_id;
+        }
+        let label_id = self.next_label();
+        self.lmap.insert(signature, label_id);
+        label_id
     }
 
 }

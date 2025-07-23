@@ -122,9 +122,9 @@ impl TopLevel {
             Subw(rd, rs1, rs2) =>
                 output.push_str(&format!("subw\t{}, {}, {}", self.emit_operand(rd), self.emit_operand(rs1), self.emit_operand(rs2))),
             Addi(rd, rs1, imm) =>
-                output.push_str(&format!("addi\t{}, {}, {}", self.emit_operand(rd), self.emit_operand(rs1), self.emit_operand(imm))),
+                output.push_str(&format!("addi\t{}, {}, {}", self.emit_operand(rd), self.emit_operand(rs1), imm)),
             Addiw(rd, rs1, imm) =>
-                output.push_str(&format!("addiw\t{}, {}, {}", self.emit_operand(rd), self.emit_operand(rs1), self.emit_operand(imm))),
+                output.push_str(&format!("addiw\t{}, {}, {}", self.emit_operand(rd), self.emit_operand(rs1), imm)),
             Mul(rd, rs1, rs2) =>
                 output.push_str(&format!("mul\t{}, {}, {}", self.emit_operand(rd), self.emit_operand(rs1), self.emit_operand(rs2))),
             Mulw(rd, rs1, rs2) =>
@@ -159,6 +159,10 @@ impl TopLevel {
                 output.push_str(&format!("bne\t{}, {}, {}", self.emit_operand(rs1), self.emit_operand(rs2), self.emit_label_operand(label))),
             Call(name) =>
                 output.push_str(&format!("call\t{}", self.strtb.get(*name).unwrap())),
+            LoadStatic(rd, name) => 
+                output.push_str(&format!("load_static\t{}, {}", self.emit_operand(rd), self.strtb.get(*name).unwrap())),
+            StoreStatic(name, rs) =>
+                output.push_str(&format!("store_static\t{}, {}", self.strtb.get(*name).unwrap(), self.emit_operand(rs))),
             Ret =>
                 output.push_str("ret"),
             Lw(rd, mem) =>
@@ -169,8 +173,6 @@ impl TopLevel {
                 output.push_str(&format!("ld\t{}, {}", self.emit_operand(rd), self.emit_operand(mem))),
             Sd(rs, mem) =>
                 output.push_str(&format!("sd\t{}, {}", self.emit_operand(rs), self.emit_operand(mem))),
-            Ldu(rd, mem) =>
-                output.push_str(&format!("ldu\t{}, {}", self.emit_operand(rd), self.emit_operand(mem))),
             Mv(rd, rs) =>
                 output.push_str(&format!("mv\t{}, {}", self.emit_operand(rd), self.emit_operand(rs))),
             Li(rd, imm) =>
