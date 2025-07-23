@@ -71,8 +71,12 @@ mod tests {
         let (lir, codegen_regalloc) = codegen_parse.parse(tac);
         let (lir, codegen_spill) = codegen_regalloc.alloc(lir);
         let (lir, codegen_canonic) = codegen_spill.spill(lir);
+        let lir = codegen_canonic.canonic(lir);
 
-        println!("{}", lir.emit());
+        // write to test file
+        // let output = lir.emit();
+        // let output_path = format!("{}.lir.S", path);
+        // std::fs::write(output_path, output).unwrap();
     }
 
     #[test]

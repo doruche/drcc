@@ -69,161 +69,149 @@ impl CodeGen<Spill> {
         match insn {
             Insn::Intermediate(_) => insn,
             Insn::Add(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Add(dst, left, right)
             },
             Insn::Addw(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 4);
+                let left = self.spill_operand(left, 4);
+                let right = self.spill_operand(right, 4);
                 Insn::Addw(dst, left, right)
             },
             Insn::Addi(dst, src, imm) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 8);
                 Insn::Addi(dst, src, imm)
             },
             Insn::Sub(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Sub(dst, left, right)
             },
             Insn::Subw(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 4);
+                let left = self.spill_operand(left, 4);
+                let right = self.spill_operand(right, 4);
                 Insn::Subw(dst, left, right)
             },
             Insn::Mul(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Mul(dst, left, right)
             },
             Insn::Mulw(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 4);
+                let left = self.spill_operand(left, 4);
+                let right = self.spill_operand(right, 4);
                 Insn::Mulw(dst, left, right)
             },
             Insn::Div(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Div(dst, left, right)
             },
             Insn::Divw(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 4);
+                let left = self.spill_operand(left, 4);
+                let right = self.spill_operand(right, 4);
                 Insn::Divw(dst, left, right)
             },
             Insn::Rem(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Rem(dst, left, right)
             },
             Insn::Remw(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 4);
+                let left = self.spill_operand(left, 4);
+                let right = self.spill_operand(right, 4);
                 Insn::Remw(dst, left, right)
             },
             Insn::Beq(left, right, label) => {
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Beq(left, right, label)
             },
             Insn::Bne(left, right, label) => {
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Bne(left, right, label)
             },
             Insn::Slt(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Slt(dst, left, right)
             },
             Insn::Sgt(dst, left, right) => {
-                let dst = self.spill_operand(dst);
-                let left = self.spill_operand(left);
-                let right = self.spill_operand(right);
+                let dst = self.spill_operand(dst, 8);
+                let left = self.spill_operand(left, 8);
+                let right = self.spill_operand(right, 8);
                 Insn::Sgt(dst, left, right)
             },
             Insn::Seqz(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 8);
                 Insn::Seqz(dst, src)
             },
             Insn::Snez(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 8);
                 Insn::Snez(dst, src)
             },
             Insn::Sextw(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 4);
                 Insn::Sextw(dst, src)
             },
             Insn::Label(label) => Insn::Label(label),
-            Insn::J(label) => Insn::J(label),
-            Insn::Jr(operand) => {
-                let operand = self.spill_operand(operand);
-                Insn::Jr(operand)
-            },
             Insn::Call(name) => Insn::Call(name),
             Insn::Ret => Insn::Ret,
+            Insn::J(label) => Insn::J(label),
             Insn::Ld(dst, mem) => {
-                let dst = self.spill_operand(dst);
-                let mem = self.spill_operand(mem);
+                let dst = self.spill_operand(dst, 8);
+                let mem = self.spill_operand(mem, 8);
                 Insn::Ld(dst, mem)
             },
             Insn::Lw(dst, mem) => {
-                let dst = self.spill_operand(dst);
-                let mem = self.spill_operand(mem);
+                let dst = self.spill_operand(dst, 4);
+                let mem = self.spill_operand(mem, 4);
                 Insn::Lw(dst, mem)
             },
             Insn::Sd(src, mem) => {
-                let src = self.spill_operand(src);
-                let mem = self.spill_operand(mem);
+                let src = self.spill_operand(src, 8);
+                let mem = self.spill_operand(mem, 8);
                 Insn::Sd(src, mem)
             },
             Insn::Sw(src, mem) => {
-                let src = self.spill_operand(src);
-                let mem = self.spill_operand(mem);
+                let src = self.spill_operand(src, 4);
+                let mem = self.spill_operand(mem, 4);
                 Insn::Sw(src, mem)
             },
             Insn::Mv(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 8);
                 Insn::Mv(dst, src)
             },
-            Insn::Li(dst, imm) => {
-                let dst = self.spill_operand(dst);
-                Insn::Li(dst, imm)
-            },
-            Insn::La(dst, name) => {
-                let dst = self.spill_operand(dst);
-                Insn::La(dst, name)
-            },
             Insn::Neg(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 8);
                 Insn::Neg(dst, src)
             },
             Insn::Negw(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 4);
+                let src = self.spill_operand(src, 4);
                 Insn::Negw(dst, src)
             },
             Insn::Not(dst, src) => {
-                let dst = self.spill_operand(dst);
-                let src = self.spill_operand(src);
+                let dst = self.spill_operand(dst, 8);
+                let src = self.spill_operand(src, 8);
                 Insn::Not(dst, src)
             },
             _ => unreachable!(),
@@ -233,11 +221,12 @@ impl CodeGen<Spill> {
     fn spill_operand(
         &mut self,
         operand: Operand,
+        size: usize,
     ) -> Operand {
         match operand {
             Operand::VirtReg(v_reg_id) => {
                 let offset = self.spill_vreg(v_reg_id);
-                Operand::Frame(offset)
+                Operand::Frame(offset, size)
             },
             _ => operand,
         }

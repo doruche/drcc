@@ -151,8 +151,6 @@ impl TopLevel {
                 output.push_str(&format!("{}:", self.emit_label_operand(label))),
             J(label) =>
                 output.push_str(&format!("j\t{}", self.emit_label_operand(label))),
-            Jr(rs) =>
-                output.push_str(&format!("jr\t{}", self.emit_operand(rs))),
             Beq(rs1, rs2, label) =>
                 output.push_str(&format!("beq\t{}, {}, {}", self.emit_operand(rs1), self.emit_operand(rs2), self.emit_label_operand(label))),
             Bne(rs1, rs2, label) =>
@@ -201,9 +199,9 @@ impl TopLevel {
             VirtReg(id) => format!("v{}", id),
             PhysReg(reg) => format!("{}", reg),
             Imm(constant) => format!("{}", constant),
-            Frame(offset) => format!("{}(s0)", offset),
-            Stack(offset) => format!("{}(sp)", offset),
-            Static(name) => format!("{}", self.strtb.get(*name).unwrap()),
+            Frame(offset, ..) => format!("{}(s0)", offset),
+            Stack(offset, ..) => format!("{}(sp)", offset),
+            Static(name, ..) => format!("{}", self.strtb.get(*name).unwrap()),
         }
     }
 

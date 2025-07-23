@@ -117,8 +117,8 @@ impl CodeGen<Parse> {
                 let offset = get_param_offset(&func.params, i);
                 // currenly we only have int and long, and no needs to consider the sign.
                 let insn = match size {
-                    4 => Insn::Lw(v_reg, Operand::Frame(offset)),
-                    8 => Insn::Ld(v_reg, Operand::Frame(offset)),
+                    4 => Insn::Lw(v_reg, Operand::Frame(offset, 4)),
+                    8 => Insn::Ld(v_reg, Operand::Frame(offset, 8)),
                     _ => unreachable!(),
                 };
                 insns.push(insn);
@@ -158,11 +158,7 @@ impl CodeGen<Parse> {
             TacInsn::Move { src, dst } => {
                 let (src_op, _) = self.parse_operand(src);
                 let (dst_op, _) = self.parse_operand(dst);
-                if let Operand::Imm(constant) = src_op {
-                    vec![Li(dst_op, constant.value())]
-                } else {
-                    vec![Mv(dst_op, src_op)]
-                }
+                vec![Mv(dst_op, src_op)]
             },
             TacInsn::Return(val) => {
                 let (val_op, _) = self.parse_operand(val);
@@ -360,8 +356,8 @@ impl CodeGen<Parse> {
                     for (i, (op, type_)) in arg_ops.into_iter().enumerate().skip(8) {
                         let offset = (i - 8) * 8;
                         let insn = match type_.size() {
-                            4 => Insn::Sw(op, Operand::Stack(offset as isize)),
-                            8 => Insn::Sd(op, Operand::Stack(offset as isize)),
+                            4 => Insn::Sw(op, Operand::Stack(offset as isize, 4)),
+                            8 => Insn::Sd(op, Operand::Stack(offset as isize, 4)),
                             _ => unreachable!(),
                         };
                         insns.push(insn);
@@ -395,7 +391,7 @@ impl CodeGen<Parse> {
         let cx = self.cur_cx_mut();
         
         let op = match operand {
-            TacOperand::Imm(val) => Operand::Imm(val),
+            TacOperand::Imm(val) => Operand::Imm(val.value()),
             TacOperand::Temp(temp_id, type_) => {
                 let v_reg_id = cx.temp_vreg(temp_id)
                     .unwrap_or_else(|| {

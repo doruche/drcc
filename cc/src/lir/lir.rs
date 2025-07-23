@@ -6,9 +6,9 @@ use crate::{asm::Register, common::*, tac::{TacAutoGenLabel, TacLabelOperand}};
 pub enum Operand {
     VirtReg(usize),
     PhysReg(Register),
-    Imm(Constant),
-    Frame(isize), // relative to fp/s8
-    Stack(isize), // relative to sp
+    Imm(i64),
+    Frame(isize, usize), // relative to fp/s8
+    Stack(isize, usize), // relative to sp
     Static(StrDescriptor),
 }
 
@@ -35,7 +35,6 @@ pub enum Insn {
     Sextw(Operand, Operand),
     Label(LabelOperand),
     J(LabelOperand),
-    Jr(Operand),    // must be a register
     Beq(Operand, Operand, LabelOperand),
     Bne(Operand, Operand, LabelOperand),
     Call(StrDescriptor),
