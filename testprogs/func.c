@@ -29,6 +29,11 @@ call_huge(void) {
 }
 
 int
+blank(void) {
+
+}
+
+int
 main(int argc) {
     int foo(void);
     int foo(void);
@@ -36,5 +41,5 @@ main(int argc) {
         int foo = 3;
         foo = 4;
     }
-    return call_huge();
+    return yet_another(10);
 }

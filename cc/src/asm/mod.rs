@@ -107,4 +107,9 @@ mod tests {
     fn test_control_flow() {
         test_inner("../testprogs/control_flow.c");
     }
+
+    #[test]
+    fn test_static() {
+        test_inner("../testprogs/static.c");
+    }
 }

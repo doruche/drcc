@@ -40,7 +40,7 @@ impl TopLevel {
         output
     }
 
-    fn emit_func(&self, func: &Function) -> String {
+    pub(super) fn emit_func(&self, func: &Function) -> String {
         let mut output = String::new();
         let params = func.params.iter()
             .map(|param| format!(

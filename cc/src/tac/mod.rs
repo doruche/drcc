@@ -106,7 +106,7 @@ mod tests {
 
         let mut codegen = CodeGen::new();
         let (tac, optimizer) = codegen.parse(prog);
-        let opted_tac = optimizer.optimize(tac);
+        let opted_tac = optimizer.optimize_all(tac);
 
         println!("{:#}", opted_tac.emit_code());
         println!("{:#}", opted_tac.emit_static_vars());

@@ -1,6 +1,7 @@
 int
 main(void) {
-    return 0;
+    int a();
+    return a();
 }
 
 static int
