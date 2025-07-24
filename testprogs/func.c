@@ -36,5 +36,5 @@ main(int argc) {
         int foo = 3;
         foo = 4;
     }
-    return another(1, 3);
+    return call_huge();
 }

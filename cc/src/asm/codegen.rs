@@ -212,17 +212,17 @@ impl CodeGen<Parse> {
 
         match insn {
             IntermediateInsn::Prologue => {
-                insns.push(Insn::Addi(Register::Sp, Register::Sp, cx.frame_size as i64));
-                insns.push(Insn::Addi(Register::S0, Register::Sp, -(cx.frame_size as i64)));
                 for &(reg, offset) in cx.callee_saved.iter() {
-                    insns.push(Insn::Sd(reg, Register::S0, offset));
+                    insns.push(Insn::Sd(reg, Register::Sp, offset));
                 }
+                insns.push(Insn::Addi(Register::Sp, Register::Sp, -(cx.frame_size as i64)));
+                insns.push(Insn::Addi(Register::S0, Register::Sp, cx.frame_size as i64));
             },
             IntermediateInsn::Epilogue => {
                 for &(reg, offset) in cx.callee_saved.iter().rev() {
                     insns.push(Insn::Ld(reg, Register::S0, offset));
                 }
-                insns.push(Insn::Addi(Register::Sp, Register::Sp, -(cx.frame_size as i64)));
+                insns.push(Insn::Addi(Register::Sp, Register::Sp, cx.frame_size as i64));
                 insns.push(Insn::Ret);
             },
         }

@@ -1,7 +1,5 @@
 //! Assembly code emission module
 //! LIR -> RISC-V Assembly
-//! Here, we do the final assembly code emission from the low-level intermediate representation (LIR).
-//! We'll do final emission, as well as some architecture-related optimizations. (e.g. peephole optimizations)
 
 mod riscv;
 mod codegen;
@@ -103,5 +101,10 @@ mod tests {
     #[test]
     fn test_func() {
         test_inner("../testprogs/func.c");
+    }
+
+    #[test]
+    fn test_control_flow() {
+        test_inner("../testprogs/control_flow.c");
     }
 }
