@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::common::*;
 use super::{
@@ -13,22 +13,37 @@ pub enum Node {
     Entry {
         successors: BTreeSet<NodeId>,
     },
-    BasicBlock {
-        id: usize,
-        insns: Vec<Insn>,
-        predecessors: BTreeSet<NodeId>,
-        successors: BTreeSet<NodeId>,
-    },
+    BasicBlock(BasicBlock),
     Exit {
         predecessors: BTreeSet<NodeId>,
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
+pub struct BasicBlock {
+    pub id: usize,
+    pub insns: Vec<Insn>,
+    pub predecessors: BTreeSet<NodeId>,
+    pub successors: BTreeSet<NodeId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NodeId {
     Entry,
     BasicBlock(usize),
     Exit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InsnId {
+    pub block_id: usize,
+    pub inblock_idx: usize,
+}
+
+impl InsnId {
+    pub fn new(block_id: usize, inblock_idx: usize) -> Self {
+        InsnId { block_id, inblock_idx }
+    }
 }
 
 impl PartialOrd for NodeId {
@@ -58,18 +73,18 @@ impl Node {
     pub fn id(&self) -> NodeId {
         match self {
             Node::Entry { .. } => NodeId::Entry,
-            Node::BasicBlock { id, .. } => NodeId::BasicBlock(*id),
+            Node::BasicBlock(BasicBlock { id, .. }) => NodeId::BasicBlock(*id),
             Node::Exit { .. } => NodeId::Exit,
         }
     }
 
     pub fn basic_block(id: usize, insns: Vec<Insn>) -> Self {
-        Node::BasicBlock {
+        Node::BasicBlock(BasicBlock {
             id,
             insns,
             predecessors: BTreeSet::new(),
             successors: BTreeSet::new(),
-        }
+        })
     }
 }
 
@@ -77,6 +92,7 @@ impl Node {
 pub struct Graph {
     pub nodes: BTreeMap<NodeId, Node>,
     pub label_map: HashMap<LabelOperand, NodeId>,
+
 }
 
 impl Graph {
@@ -146,12 +162,12 @@ impl Graph {
         for (&id, node) in nodes.iter_mut() {
             match node {
                 Node::Entry {..} | Node::Exit {..} => continue,
-                Node::BasicBlock { 
+                Node::BasicBlock(BasicBlock { 
                     id,
                     predecessors,
                     successors,
                     insns,
-                } => {
+                }) => {
                     let last_insn = insns.last()
                         .expect("Internal error: Basic block must have at least one instruction");
                     let next_id = if *id == last_basic_block_id {
@@ -201,7 +217,7 @@ fn add_edge(
             .expect("Internal error: Node not found in graph");
 
         match from {
-            Node::BasicBlock { successors, .. } => {
+            Node::BasicBlock(BasicBlock { successors, .. }) => {
                 successors.insert(to);
             },
             Node::Entry { successors, .. } => {
@@ -215,7 +231,7 @@ fn add_edge(
         let to = nodes.get_mut(&to)
             .expect("Internal error: Node not found in graph");
         match to {
-            Node::BasicBlock { predecessors, .. } => {
+            Node::BasicBlock(BasicBlock { predecessors, .. }) => {
                 predecessors.insert(from);
             },
             Node::Exit { predecessors, .. } => {
@@ -225,6 +241,7 @@ fn add_edge(
         }
     }
 }
+
 impl Graph {
     pub fn emit(mut self) -> Vec<Insn> {
         let mut insns = vec![];
@@ -232,7 +249,7 @@ impl Graph {
         for (_id, block) in self.nodes {
             match block {
                 Node::Entry {..} | Node::Exit {..} => continue,
-                Node::BasicBlock { insns: block_insns, .. } => {
+                Node::BasicBlock(BasicBlock { insns: block_insns, .. }) => {
                     insns.extend(block_insns);
                 },
             }

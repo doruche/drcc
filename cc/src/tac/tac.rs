@@ -30,7 +30,7 @@ pub enum BinaryOp {
     Or,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Operand {
     Imm(Constant),
     Var {
@@ -48,6 +48,15 @@ impl Operand {
             Operand::Imm(constant) => constant.data_type(),
             Operand::Var { data_type, .. } => *data_type,
             Operand::Temp(_, data_type) => *data_type,
+        }
+    }
+
+    pub fn is_static(&self) -> bool {
+        match self {
+            Operand::Imm(_) => false,
+            Operand::Var { local_id: None, .. } => true,
+            Operand::Var { local_id: Some(_), .. } => false,
+            Operand::Temp(_, _) => false,
         }
     }
 }
@@ -166,7 +175,7 @@ pub struct StaticVar {
     pub linkage: Linkage,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TopLevel {
     pub functions: HashMap<StrDescriptor, Function>,
     pub static_vars: HashMap<StrDescriptor, StaticVar>,

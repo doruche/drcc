@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringPool {
     pool: HashMap<String, usize>,
 }

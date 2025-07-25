@@ -3,6 +3,7 @@
 mod cfg;
 mod constant_folding;
 mod deadcode_elimination;
+mod copy_propagation;
 
 use std::collections::HashMap;
 
@@ -40,8 +41,10 @@ impl CodeGen<Opt> {
     // currently a one-pass optimizer
     fn opt_func(&mut self, func: Function) -> Function {
         let post_constant_folding = self.constant_folding(func);
+        let post_deadcode_elimination = self.deadcode_elimination(post_constant_folding);
+        let post_copy_propagation = self.copy_propagation(post_deadcode_elimination);
 
-        post_constant_folding
+        post_copy_propagation
     }
 }
 
@@ -107,15 +110,51 @@ mod tests {
         std::fs::write(output_path, asm_top_level.emit()).unwrap();
     }
 
+    fn test_opt(
+        path: &str,
+        constant_folding: bool,
+        deadcode_elimination: bool,
+        copy_propagation: bool,
+        opt_time: usize,
+    ) -> TacTopLevel {
+        // write to file
+        let mut output_path = String::new();
+        output_path.push_str(path);
+        if constant_folding {
+            output_path.push_str(".cf");
+        }
+        if deadcode_elimination {
+            output_path.push_str(".dce");
+        }
+        if copy_propagation {
+            output_path.push_str(".cp");
+        }
+        output_path.push_str(&format!(".{}.tac", opt_time));
+        
+        let mut file = std::fs::File::create(output_path).unwrap();
 
-    #[test]
-    fn test_basic() {
-        test_inner("../testprogs/basic.c");
-    }
+        let (mut tac, mut opt) = gen_tac(path);
 
-    #[test]
-    fn test_func() {
-        test_inner("../testprogs/func.c");
+        let mut refactored_funcs = HashMap::new();
+        for (_, mut func) in tac.functions {
+            for i in 0..opt_time {
+                if constant_folding {
+                    func = opt.constant_folding(func);
+                }
+                if copy_propagation {
+                    func = opt.copy_propagation(func);
+                }
+                if deadcode_elimination {
+                    func = opt.deadcode_elimination(func);
+                }
+            }
+            refactored_funcs.insert(func.name, func);
+        }
+        tac.functions = refactored_funcs;
+
+        file.write_fmt(format_args!("{}", tac.emit_code())).unwrap();
+
+        tac
     }
 
     #[test]
@@ -136,37 +175,37 @@ mod tests {
         println!("{}", tac.emit_code());
     }
 
-    fn test_dce(path: &str) {
-        // write to file
-        let output_path = format!("{}.dec.tac", path);
-        let mut file = std::fs::File::create(output_path).unwrap();
 
-        let (mut tac, mut opt) = gen_tac(path);
-
-        file.write_fmt(format_args!("Unoptimized TAC:\n{}\n", tac.emit_code())).unwrap();
-
-        let mut refactored_funcs = HashMap::new();        
-        for (_, mut func) in tac.functions {
-            let func = opt.deadcode_elimination(func);
-            refactored_funcs.insert(func.name, func);
-        }
-        tac.functions = refactored_funcs;
-
-        file.write_fmt(format_args!("Optimized TAC:\n{}\n", tac.emit_code())).unwrap();
+    #[test]
+    fn test_basic_opt() {
+        test_opt(
+            "../testprogs/basic.c", 
+            true, 
+            true, 
+            true,
+            2,
+        );        
     }
 
     #[test]
-    fn test_dce_control_flow() {
-        test_dce("../testprogs/control_flow.c");
+    fn test_control_flow_opt() {
+        test_opt(
+            "../testprogs/control_flow.c", 
+            true, 
+            true, 
+            true,
+            2,
+        );
     }
 
     #[test]
-    fn test_dec_basic() {
-        test_dce("../testprogs/basic.c");
-    }
-
-    #[test]
-    fn test_dce_func() {
-        test_dce("../testprogs/func.c");
+    fn test_control_flow() {
+        test_opt(
+            "../testprogs/control_flow.c", 
+            false, 
+            false, 
+            false,
+            0,
+        );
     }
 }

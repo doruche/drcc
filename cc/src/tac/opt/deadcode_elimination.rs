@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, VecDeque};
 
 use crate::common::*;
+use crate::tac::opt::cfg::BasicBlock;
 use super::{
     Operand,
     Insn,
@@ -56,7 +57,7 @@ fn prune_blocks(cfg: Graph) -> Graph {
         let node = nodes.get(&id).expect("Internal error: Node not found in graph");
         match node {
             Node::Entry { successors } |
-            Node::BasicBlock { successors, .. } => {
+            Node::BasicBlock(BasicBlock { successors, .. }) => {
                 for succ in successors.iter() {
                     if !visited.contains(succ) {
                         to_visit_id.push_back(*succ);
@@ -79,20 +80,20 @@ fn prune_blocks(cfg: Graph) -> Graph {
                     predecessors.retain(|pred| visited.contains(pred));
                     Node::Exit { predecessors }
                 },
-                Node::BasicBlock {
+                Node::BasicBlock(BasicBlock {
                     id,
                     mut predecessors,
                     mut successors,
                     insns,
-                } => {
+                }) => {
                     predecessors.retain(|pred| visited.contains(pred));
                     successors.retain(|succ| visited.contains(succ));
-                    Node::BasicBlock {
+                    Node::BasicBlock(BasicBlock {
                         id,
                         predecessors,
                         successors,
                         insns,
-                    }
+                    })
                 }
             };
             (id, node)
@@ -115,11 +116,11 @@ fn remove_useless_jumps(cfg: Graph) -> Graph {
         let default_succ = ids[i + 1];
         let node = &mut nodes[i];
         match node {
-            Node::BasicBlock {
+            Node::BasicBlock(BasicBlock {
                 insns,
                 successors,
                 ..
-            } => {
+            }) => {
                 let last_insn = insns.last().unwrap();
                 match last_insn {
                     Insn::Jump(..) |
@@ -163,23 +164,17 @@ fn remove_useless_labels(cfg: Graph) -> Graph {
         let node = &mut nodes[i];
         let default_pred = ids[i - 1];
         match node {
-            Node::BasicBlock { predecessors, insns, .. } => {
-                let mut keep_labels = false;
+            Node::BasicBlock(BasicBlock { predecessors, insns, .. }) => {
+                let mut keep_label = false;
                 for pred in predecessors.iter() {
                     if *pred != default_pred {
-                        keep_labels = true;
+                        keep_label = true;
                         break;
                     }
                 }
-                if !keep_labels {
-                    // remove all labels at the beginning of the block
-                    // this is an inefficient way to do it, but it works for now
-                    loop {
-                        if let Some(Insn::Label(_)) = insns.first() {
-                            insns.remove(0);
-                        } else {
-                            break;
-                        }
+                if !keep_label {
+                    if let Some(Insn::Label(..)) = insns.first() {
+                        insns.remove(0);
                     }
                 }
             }

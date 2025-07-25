@@ -10,7 +10,7 @@ pub use token::{RawToken, Token, TokenType};
 pub use error::{Error, Result};
 pub use string_pool::{StringPool, StrDescriptor};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DataType {
     Int,
     Long,
@@ -82,7 +82,7 @@ pub enum InitVal {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Constant {
     Int(i32),
     Long(i64),
