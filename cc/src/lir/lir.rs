@@ -85,7 +85,7 @@ pub enum IntermediateInsn {
     Epilogue,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LabelOperand {
     AutoGen(usize),
     Named(StrDescriptor),   

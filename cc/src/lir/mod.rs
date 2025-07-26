@@ -4,7 +4,6 @@
 //! 1. Convert the TAC code into an incomplete LIR.
 //! 2. Register allocation.
 //! 3. Instruction canonicalization.
-//! 4. Prologue/epilogue insertion.
 //! NOTE Since we start register allocation immediately after the LIR conversion, 
 //! we have to ensure not generating illegal instructions such as:
 //! 1. mv   a(mem1), b(mem2),

@@ -1,6 +1,3 @@
-//! 2nd pass of LIR code generation.
-//! Map virtual registers to physical registers or spill them to memory.
-
 use std::collections::{HashMap, HashSet};
 
 use crate::{asm::Register, common::*};
@@ -17,19 +14,21 @@ use super::{
 
 mod rig;
 mod alloc;
+mod live_analysis;
 
 /// Register interference graph, per function.
 #[derive(Debug)]
 pub struct Rig {
-    pub nodes: HashMap<RigNode, Vec<RigNode>>,
+    pub nodes: HashMap<GeneralReg, RigNode>,
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RigNode {
     pub reg: GeneralReg,
     pub spill_cost: usize,
     pub color: Option<Register>,
+    pub neighbors: HashSet<GeneralReg>,
 }
 
 impl RigNode {
@@ -38,6 +37,7 @@ impl RigNode {
             reg,
             spill_cost,
             color: None,
+            neighbors: HashSet::new(),
         }
     }
 }
@@ -46,4 +46,9 @@ impl RigNode {
 pub enum GeneralReg {
     Phys(Register),
     Virt(usize),
+}
+
+#[derive(Debug)]
+pub struct AnalyzeResult {
+    pub map: HashMap<GeneralReg, Register>,
 }
