@@ -277,7 +277,6 @@ impl<'a> CopyPropagation<'a> {
                 Node::Exit { .. } => continue,
                 Node::BasicBlock(block) => {
                     to_process.push_back(block);
-                    self.annotate_block(block.id, self.initial_copies.clone());
                     while let Some(b) = to_process.pop_front() {
                         let prev = self.retrieve_block_defs(b.id)
                             .expect("Internal error: Basic block not found in block_defs")
@@ -503,9 +502,6 @@ fn rewrite_operand(
         Operand::Imm(..) => operand,
         _ => {
             if let Some((_, src)) = reaching_copies.iter().find(|(dst, _)| *dst == operand) {
-                #[cfg(test)]
-                    println!("[debug]\tRewriting operand {:?} to {:?}", operand, src);
-                
                 src
             } else {
                 operand

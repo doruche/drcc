@@ -81,6 +81,7 @@ mod tests {
         constant_folding: bool,
         deadcode_elimination: bool,
         copy_propagation: bool,
+        deadstore_elimination: bool,
         opt_time: usize,
     ) {
         let input = read_to_string(path).unwrap();
@@ -93,6 +94,9 @@ mod tests {
         }
         if copy_propagation {
             output_path.push_str(".cp");
+        }
+        if deadstore_elimination {
+            output_path.push_str(".dse");
         }
         let output_path = format!("{}.{}.S", output_path, opt_time);
         let mut file = std::fs::File::create(output_path).unwrap();
@@ -122,6 +126,9 @@ mod tests {
                 if copy_propagation {
                     func = opt.copy_propagation(func);
                 }
+                if deadstore_elimination {
+                    func = opt.deadstore_elimination(func);
+                }
             }
             refactored_funcs.insert(func.name, func);
         }
@@ -139,6 +146,7 @@ mod tests {
             true,
             true,
             true,
+            true,
             2,
         );
     }
@@ -147,6 +155,7 @@ mod tests {
     fn test_basic() {
         test_inner(
             "../testprogs/basic.c",
+            false,
             false,
             false,
             false,
@@ -161,6 +170,7 @@ mod tests {
             true,
             true,
             true,
+            true,
             2,
         );
     }
@@ -169,6 +179,7 @@ mod tests {
     fn test_control_flow() {
         test_inner(
             "../testprogs/control_flow.c",
+            false,
             false,
             false,
             false,
@@ -183,6 +194,7 @@ mod tests {
             true,
             true,
             true,
+            true,
             2,
         );
     }
@@ -194,7 +206,20 @@ mod tests {
             false,
             false,
             false,
+            false,
             0,
+        );
+    }
+
+    #[test]
+    fn test_ternary_opt() {
+        test_inner(
+            "../testprogs/ternary.c",
+            true,
+            true,
+            true,
+            true,
+            2,
         );
     }
 }

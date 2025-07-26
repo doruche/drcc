@@ -4,6 +4,7 @@ mod cfg;
 mod constant_folding;
 mod deadcode_elimination;
 mod copy_propagation;
+mod deadstore_elimination;
 
 use std::collections::HashMap;
 
@@ -59,6 +60,7 @@ mod tests {
     use crate::ast::AstParser;
     use crate::sem::HirParser;
     use crate::tac::opt::cfg::Graph;
+    use crate::tac::opt::deadstore_elimination;
     use crate::tac::{Opt, TacCodeGen, TacTopLevel};
     use crate::lir::LirCodeGen;
 
@@ -115,6 +117,7 @@ mod tests {
         constant_folding: bool,
         deadcode_elimination: bool,
         copy_propagation: bool,
+        deadstore_elimination: bool,
         opt_time: usize,
     ) -> TacTopLevel {
         // write to file
@@ -128,6 +131,9 @@ mod tests {
         }
         if copy_propagation {
             output_path.push_str(".cp");
+        }
+        if deadstore_elimination {
+            output_path.push_str(".dse");
         }
         output_path.push_str(&format!(".{}.tac", opt_time));
         
@@ -146,6 +152,9 @@ mod tests {
                 }
                 if deadcode_elimination {
                     func = opt.deadcode_elimination(func);
+                }
+                if deadstore_elimination {
+                    func = opt.deadstore_elimination(func);
                 }
             }
             refactored_funcs.insert(func.name, func);
@@ -183,8 +192,21 @@ mod tests {
             true, 
             true, 
             true,
+            true,
             2,
         );        
+    }
+
+    #[test]
+    fn test_basic() {
+        test_opt(
+            "../testprogs/basic.c", 
+            false, 
+            false, 
+            false,
+            false,
+            0,
+        );
     }
 
     #[test]
@@ -194,7 +216,8 @@ mod tests {
             true, 
             true, 
             true,
-            2,
+            true,
+            1,
         );
     }
 
@@ -204,6 +227,7 @@ mod tests {
             "../testprogs/control_flow.c", 
             false, 
             false, 
+            false,
             false,
             0,
         );

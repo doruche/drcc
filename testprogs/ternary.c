@@ -1,7 +1,9 @@
 int
 main(void) {
+    int another(void);
+    int yet_another(void);
     int a = 0;
-    a = 1 ? 2 : 3;
+    return yet_another();
 }
 
 int

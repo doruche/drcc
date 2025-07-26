@@ -103,6 +103,7 @@ impl CodeGen<Parse> {
             strtb,
         }, CodeGen {
             cur_cx: None,
+            static_vars: self.static_vars,
             _stage: PhantomData,
         })
     }
@@ -305,6 +306,8 @@ impl CodeGen<Parse> {
                         (operand, None)
                     },
                     HirVariable::Static { name, data_type } => {
+                        self.static_vars.insert((name, data_type));
+                        
                         let operand = Operand::Var {
                             name,
                             local_id: None,

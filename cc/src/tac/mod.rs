@@ -1,7 +1,7 @@
 //! Three-Address Code (TAC/MIR) module.
 //! HIR -> TAC
 
-use std::{collections::HashMap, fmt::Display, marker::PhantomData};
+use std::{collections::{HashMap, HashSet}, fmt::Display, marker::PhantomData};
 
 mod codegen;
 mod opt;
@@ -23,7 +23,7 @@ pub use tac::{
 };
 pub use CodeGen as TacCodeGen;
 
-
+use crate::common::*;
 use tac::{
     Operand,
     Insn,
@@ -52,6 +52,8 @@ pub struct FuncContext {
 #[derive(Debug)]
 pub struct CodeGen<Stage = Parse> {
     pub cur_cx: Option<FuncContext>,
+
+    pub static_vars: HashSet<(StrDescriptor, DataType)>,
     _stage: PhantomData<Stage>,
 }
 
@@ -59,6 +61,7 @@ impl CodeGen {
     pub fn new() -> Self {
         Self {
             cur_cx: None,
+            static_vars: HashSet::new(),
             _stage: PhantomData,
         }
     }
