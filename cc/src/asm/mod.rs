@@ -130,7 +130,7 @@ mod tests {
                     func = opt.deadstore_elimination(func);
                 }
             }
-            refactored_funcs.insert(func.name, func);
+            refactored_funcs.insert(func.name(), func);
         }
         tac_to_opt.functions = refactored_funcs;
 

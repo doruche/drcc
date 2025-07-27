@@ -54,47 +54,53 @@ impl CodeGen<Parse> {
 
         // functions
         for (name, function) in hir.funcs {
-            if function.body.is_none() {
-                // TODO
-                continue;
-            }
-            
             let linkage = function.linkage;
-            let params = function.params
-                .into_iter()
-                .map(Param::from)
-                .collect::<Vec<_>>();
-            let return_type = function.return_type;
+            match function.body {
+                None => {
+                    let type_ = function.type_;
+                    functions.insert(name, Function::Declared {
+                        linkage,
+                        name,
+                        type_,
+                    });
+                },
+                Some(insns) => {
+                    let params = function.params
+                        .into_iter()
+                        .map(Param::from)
+                        .collect::<Vec<_>>();
+                    let return_type = function.type_.return_type;
 
-            self.cur_cx = Some(FuncContext {
-                local_vars: HashMap::new(),
-            });
-            let mut func_insns = vec![];
-            let next_temp_id = &mut 0;
-            let next_branch_label = &mut 0;
-            for item in function.body.unwrap() {
-                let insn = self.parse_block_item(item, next_temp_id, next_branch_label);
-                func_insns.extend(insn);
+                    self.cur_cx = Some(FuncContext {
+                        local_vars: HashMap::new(),
+                    });
+                    let mut func_insns = vec![];
+                    let next_temp_id = &mut 0;
+                    let next_branch_label = &mut 0;
+                    for item in insns {
+                        let insn = self.parse_block_item(item, next_temp_id, next_branch_label);
+                        func_insns.extend(insn);
+                    }
+
+                    // C standard specifies that a function without a return statement will
+                    // return 0 if it is the main function, otherwise:
+                    // 1. undefined behavior, if the value is used by the caller
+                    // 2. works fine, if the value is not used by the caller
+                    // hence, we insert a 'ret 0' instruction to make sure the standard is followed
+                    func_insns.push(Insn::Return(Operand::Imm(Constant::Int(0))));
+
+                    functions.insert(name, Function::Defined {
+                        return_type,
+                        linkage,
+                        name,
+                        params,
+                        local_vars: self.cur_cx.take().unwrap().local_vars,
+                        body: func_insns,
+                    });
+
+                    self.cur_cx = None;
+                }
             }
-
-            // C standard specifies that a function without a return statement will
-            // return 0 if it is the main function, otherwise:
-            // 1. undefined behavior, if the value is used by the caller
-            // 2. works fine, if the value is not used by the caller
-            // hence, we insert a 'ret 0' instruction to make sure the standard is followed
-            func_insns.push(Insn::Return(Operand::Imm(Constant::Int(0))));
-            
-
-            functions.insert(name, Function {
-                return_type,
-                linkage,
-                name,
-                params,
-                local_vars: self.cur_cx.take().unwrap().local_vars,
-                body: func_insns,
-            });
-
-            self.cur_cx = None;
         }
 
         (TopLevel {

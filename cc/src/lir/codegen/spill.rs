@@ -53,10 +53,8 @@ impl CodeGen<Spill> {
         let cx = self.cur_cx_mut();
         cx.frame_size = (cx.frame_size + 15) / 16 * 16;
 
-        // We won't further use these fields in FuncContext anymore.
         func.body = s_insns;
         func.frame_size = cx.frame_size;
-        func.callee_saved = cx.callee_saved.take();
 
 
         self.cur_func = None;

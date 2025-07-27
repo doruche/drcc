@@ -74,7 +74,7 @@ impl<'a> TypeChecker<'a> {
             return Ok(func);
         }
 
-        self.cur_return_type = Some(func.return_type);
+        self.cur_return_type = Some(func.type_.return_type);
         let mut func = func;
         
         let mut typed_body = vec![];

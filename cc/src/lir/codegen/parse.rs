@@ -63,13 +63,13 @@ impl CodeGen<Parse> {
 
         // Parse functions
         for (name, func) in tac.functions {
-            let type_ = get_functype(&func);
+            let type_ = func.type_();
             let cx = FuncContext::new(name, type_);
             self.func_cxs.insert(name, cx);
             self.cur_func = Some(name);
 
             let parsed_func = self.parse_function(func);            
-            functions.insert(name, parsed_func);
+            parsed_func.map(|func| functions.insert(func.name, func));
 
             self.cur_func = None;
         }
@@ -92,57 +92,66 @@ impl CodeGen<Parse> {
 }
 
 impl CodeGen<Parse> {
-    /// this will produce a function with incomplete instructions.
-    /// it has no a complete prologue or epilogue, as we have to calculate
-    /// the frame size through all stages.
     fn parse_function(
         &mut self,
         func: TacFunction,
-    ) -> Function {
-        let mut insns = vec![];
-        let cx = self.cur_func
-            .as_ref()
-            .and_then(|name| self.func_cxs.get_mut(name))
-            .expect("Internal error: Current function context not found");
+    ) -> Option<Function> {
+        match func {
+            TacFunction::Declared {..} => return None,
+            TacFunction::Defined {
+                return_type,
+                linkage,
+                name,
+                params,
+                local_vars,
+                body,
+            } => {
+                let mut insns = vec![];
+                let cx = self.cur_func
+                    .as_ref()
+                    .and_then(|name| self.func_cxs.get_mut(name))
+                    .expect("Internal error: Current function context not found");
 
-        insns.push(Insn::Intermediate(IntermediateInsn::Prologue));
+                insns.push(Insn::Intermediate(IntermediateInsn::Prologue));
 
-        for (i, param) in func.params.iter().enumerate() {
-            let v_reg_id = cx.alloc_v_reg();
-            let v_reg = Operand::VirtReg(v_reg_id);
-            if i < 8 {
-                insns.push(Insn::Mv(v_reg, Operand::PhysReg(Register::a(i))));
-            } else {
-                let size = param.data_type.size();
-                let offset = get_param_offset(&func.params, i);
-                // currenly we only have int and long, and no needs to consider the sign.
-                let insn = match size {
-                    4 => Insn::Lw(v_reg, Operand::frame(offset, 4)),
-                    8 => Insn::Ld(v_reg, Operand::frame(offset, 8)),
-                    _ => unreachable!(),
-                };
-                insns.push(insn);
+                for (i, param) in params.iter().enumerate() {
+                    let v_reg_id = cx.alloc_v_reg();
+                    let v_reg = Operand::VirtReg(v_reg_id);
+                    if i < 8 {
+                        insns.push(Insn::Mv(v_reg, Operand::PhysReg(Register::a(i))));
+                    } else {
+                        let size = param.data_type.size();
+                        let offset = get_param_offset(&params, i);
+                        // currenly we only have int and long, and no needs to consider the sign.
+                        let insn = match size {
+                            4 => Insn::Lw(v_reg, Operand::frame(offset, 4)),
+                            8 => Insn::Ld(v_reg, Operand::frame(offset, 8)),
+                            _ => unreachable!(),
+                        };
+                        insns.push(insn);
+                    }
+                    cx.map_var2vreg(param.local_id, v_reg_id);
+                }       
+
+                let func_type = cx.type_.clone();
+
+                let mut parsed_body = vec![];
+                for insn in body {
+                    self.parse_insn(insn).map(|parsed_insns| {
+                        parsed_body.extend(parsed_insns);
+                    });
+                }
+                insns.extend(parsed_body);
+
+                Some(Function {
+                    name,
+                    linkage,
+                    func_type,
+                    body: insns,
+                    frame_size: 0,
+                    callee_saved: None,
+                })
             }
-            cx.map_var2vreg(param.local_id, v_reg_id);
-        }       
-
-        let func_type = cx.type_.clone();
-
-        let mut parsed_body = vec![];
-        for insn in func.body {
-            self.parse_insn(insn).map(|parsed_insns| {
-                parsed_body.extend(parsed_insns);
-            });
-        }
-        insns.extend(parsed_body);
-
-        Function {
-            name: func.name,
-            linkage: func.linkage,
-            func_type,
-            body: insns,
-            frame_size: 0,
-            callee_saved: None,
         }
     }
 
@@ -446,13 +455,6 @@ impl CodeGen<Parse> {
         label_id
     }
 
-}
-
-fn get_functype(func: &TacFunction) -> FuncType {
-    FuncType {
-        return_type: func.return_type,
-        param_types: func.params.iter().map(|p| p.data_type).collect(),
-    }
 }
 
 fn get_param_offset(

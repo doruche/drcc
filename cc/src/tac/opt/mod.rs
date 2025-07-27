@@ -61,7 +61,7 @@ mod tests {
     use crate::sem::HirParser;
     use crate::tac::opt::cfg::Graph;
     use crate::tac::opt::deadstore_elimination;
-    use crate::tac::{Opt, TacCodeGen, TacTopLevel};
+    use crate::tac::{Opt, TacCodeGen, TacFunction, TacTopLevel};
     use crate::lir::LirCodeGen;
 
     fn gen_tac(path: &str) -> (TacTopLevel, TacCodeGen<Opt>) {
@@ -157,7 +157,7 @@ mod tests {
                     func = opt.deadstore_elimination(func);
                 }
             }
-            refactored_funcs.insert(func.name, func);
+            refactored_funcs.insert(func.name(), func);
         }
         tac.functions = refactored_funcs;
 
@@ -165,25 +165,6 @@ mod tests {
 
         tac
     }
-
-    #[test]
-    fn test_cfg() {
-        let (mut tac, opt) = gen_tac("../testprogs/control_flow.c");
-
-        println!("{}", tac.emit_code());
-
-        let mut refactored_funcs = HashMap::new();        
-        for (_, mut func) in tac.functions {
-            let graph = Graph::build(func.body);
-            let refactored_code = graph.emit();
-            func.body = refactored_code;
-            refactored_funcs.insert(func.name, func);
-        }
-        tac.functions = refactored_funcs;
-
-        println!("{}", tac.emit_code());
-    }
-
 
     #[test]
     fn test_basic_opt() {

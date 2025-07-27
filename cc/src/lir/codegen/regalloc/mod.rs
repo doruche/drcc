@@ -10,6 +10,7 @@ use super::{
     Function,
     Insn,
     Operand,
+    FuncContext,
 };
 
 mod rig;
@@ -18,8 +19,9 @@ mod live_analysis;
 
 /// Register interference graph, per function.
 #[derive(Debug)]
-pub struct Rig {
+pub struct Rig<'a> {
     pub nodes: HashMap<GeneralReg, RigNode>,
+    pub func_cxs: &'a HashMap<StrDescriptor, FuncContext>,
 }
 
 
@@ -48,7 +50,19 @@ pub enum GeneralReg {
     Virt(usize),
 }
 
+impl TryFrom<Operand> for GeneralReg {
+    type Error = ();
+
+    fn try_from(op: Operand) -> std::result::Result<Self, Self::Error> {
+        match op {
+            Operand::PhysReg(reg) => Ok(GeneralReg::Phys(reg)),
+            Operand::VirtReg(virt_reg) => Ok(GeneralReg::Virt(virt_reg)),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct AnalyzeResult {
-    pub map: HashMap<GeneralReg, Register>,
+    pub map: HashMap<GeneralReg, Option<Register>>,
 }

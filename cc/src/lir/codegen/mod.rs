@@ -63,6 +63,19 @@ impl FuncContext {
         }
     }
 
+    pub fn push_callee_saved(&mut self, reg: Register) {
+        if let Some(callee_saved) = &mut self.callee_saved {
+            if callee_saved.iter().any(|(r, _)| *r == reg) {
+                return;
+            }
+            let offset = -(self.frame_size as isize + 8);
+            callee_saved.push((reg, offset));
+            self.frame_size += 8;
+        } else {
+            panic!("Internal error: callee_saved is None, cannot push register");
+        }
+    }
+
     pub fn alloc_v_reg(&mut self) -> usize {
         let v_reg = self.next_v_reg;
         self.next_v_reg += 1;

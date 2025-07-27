@@ -158,13 +158,39 @@ pub struct LocalVar {
 }
 
 #[derive(Debug, Clone)]
-pub struct Function {
-    pub return_type: DataType,
-    pub linkage: Linkage,
-    pub name: StrDescriptor,
-    pub params: Vec<Param>,
-    pub local_vars: HashMap<usize, LocalVar>,
-    pub body: Vec<Insn>,
+pub enum Function {
+    Defined {
+        return_type: DataType,
+        linkage: Linkage,
+        name: StrDescriptor,
+        params: Vec<Param>,
+        local_vars: HashMap<usize, LocalVar>,
+        body: Vec<Insn>,
+    },
+    Declared {
+        linkage: Linkage,
+        name: StrDescriptor,
+        type_: FuncType,
+    }
+}
+
+impl Function {
+    pub fn name(&self) -> StrDescriptor {
+        match self {
+            Function::Defined { name, .. } => *name,
+            Function::Declared { name, .. } => *name,
+        }
+    }
+
+    pub fn type_(&self) -> FuncType {
+        match self {
+            Function::Defined { return_type, params, .. } => FuncType {
+                return_type: *return_type,
+                param_types: params.iter().map(|p| p.data_type).collect(),
+            },
+            Function::Declared { type_, .. } => type_.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

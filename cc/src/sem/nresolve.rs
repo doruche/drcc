@@ -58,7 +58,7 @@ impl Parser {
                 let body = if let Some(body) = body {
                     self.symtb.ndef_func(
                         name.0,
-                        functype,
+                        functype.clone(),
                         storage_class,
                     ).map_err(|e| (e, name.1))?;
                     self.symtb.enter_block();
@@ -87,7 +87,7 @@ impl Parser {
                 } else {
                     self.symtb.ndecl_func(
                         name.0,
-                        functype,
+                        functype.clone(),
                         storage_class,
                     ).map_err(|e| (e, name.1))?;
                     None
@@ -104,8 +104,8 @@ impl Parser {
                 } else {
                     self.functions.insert(name.0, Function {
                         name: name.0,
+                        type_: functype,
                         params: r_params,
-                        return_type,
                         linkage: match storage_class {
                             StorageClass::Static => Linkage::Internal,
                             _ => Linkage::External,

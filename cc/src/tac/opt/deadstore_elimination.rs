@@ -132,11 +132,11 @@ impl<'a> LiveAnalysis<'a> {
                 Insn::SignExt { dst, src } |
                 Insn::Truncate { dst, src } |
                 Insn::Unary { dst, src, ..} => {
-                    (*src).try_into().map(|var| {
-                        current.inner.insert(var);
-                    });
                     (*dst).try_into().map(|var| {
                         current.inner.remove(&var);
+                    });
+                    (*src).try_into().map(|var| {
+                        current.inner.insert(var);
                     });
                 },
                 Insn::Binary {
@@ -145,28 +145,29 @@ impl<'a> LiveAnalysis<'a> {
                     right,
                     ..
                 } => {
+                    (*dst).try_into().map(|var| {
+                        current.inner.remove(&var);
+                    });
                     (*left).try_into().map(|var| {
                         current.inner.insert(var);
                     });
                     (*right).try_into().map(|var| {
                         current.inner.insert(var);
                     });
-                    (*dst).try_into().map(|var| {
-                        current.inner.remove(&var);
-                    });
                 },
                 Insn::FuncCall { dst, args, .. } => {
                     // cz we don't know whether the function reads static variables,
                     // we take a conservative approach - add all static variables
                     // to the live set.
+                    (*dst).try_into().map(|var| {
+                        current.inner.remove(&var);
+                    });
                     for &arg in args {
                         arg.try_into().map(|var| {
                             current.inner.insert(var);
                         });
                     }
-                    (*dst).try_into().map(|var| {
-                        current.inner.remove(&var);
-                    });
+                    
                     current.inner.extend(self.static_vars.inner.iter().cloned());
                 }
                 Insn::BranchIfZero { src, .. } |
@@ -276,34 +277,46 @@ impl<'a> LiveAnalysis<'a> {
 
 impl CodeGen<Opt> {
     pub fn deadstore_elimination(&mut self, func: Function) -> Function {
-        let cfg = Graph::build(func.body);
-
-        let static_vars = self.static_vars.iter()
-            .map(|&(name, data_type)| GeneralVar::Var {
+        match func {
+            Function::Declared {..} => return func,
+            Function::Defined {
+                return_type,
+                linkage,
                 name,
-                local_id: None,
-                data_type,
-            })
-            .collect::<HashSet<_>>();
-        let static_vars = LiveVars { inner: static_vars };
+                params,
+                local_vars,
+                body,
+            } => {
+                let cfg = Graph::build(body);
 
-        let analysis = LiveAnalysis::new(&cfg, static_vars);
-        let AnalysisResult {
-            block_info,
-            insn_info,
-        } = analysis.analyze();
+                let static_vars = self.static_vars.iter()
+                    .map(|&(name, data_type)| GeneralVar::Var {
+                        name,
+                        local_id: None,
+                        data_type,
+                    })
+                    .collect::<HashSet<_>>();
+                let static_vars = LiveVars { inner: static_vars };
 
-        let opted_cfg = rewrite_graph(cfg, &block_info, &insn_info);
+                let analysis = LiveAnalysis::new(&cfg, static_vars);
+                let AnalysisResult {
+                    block_info,
+                    insn_info,
+                } = analysis.analyze();
 
-        let opted_body = opted_cfg.emit();
+                let opted_cfg = rewrite_graph(cfg, &block_info, &insn_info);
 
-        Function {
-            name: func.name,
-            params: func.params,
-            return_type: func.return_type,
-            body: opted_body,
-            linkage: func.linkage,
-            local_vars: func.local_vars,
+                let opted_body = opted_cfg.emit();
+
+                Function::Defined {
+                    name,
+                    params,
+                    return_type,
+                    body: opted_body,
+                    linkage,
+                    local_vars,
+                }
+            },
         }
     }
 }

@@ -35,7 +35,7 @@ impl TopLevel {
                     ));
                 }
             }
-            output.push_str(&format!(") -> {}", func.return_type));
+            output.push_str(&format!(") -> {}", func.type_.return_type));
             output.push_str(&format!(" {}\n",
                 if let Some(body) = func.body.as_ref() {
                     format!("{:#?}", body)
@@ -84,13 +84,12 @@ pub struct LocalVarDecl {
 pub struct Function {
     pub name: StrDescriptor,
 
+    pub type_: FuncType,
+
     // 'params' field will be the parameters of the definition of the function if there exists one,
-    // otherwise just a blank vector.
     // this is because we need names of parameters to generate code.
     // but if there does not exist a definition, names do not matter.
     pub params: Vec<Param>,
-    
-    pub return_type: DataType,
     pub linkage: Linkage,
     pub body: Option<Vec<BlockItem>>,
 }

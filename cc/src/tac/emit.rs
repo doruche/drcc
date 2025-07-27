@@ -42,46 +42,78 @@ impl TopLevel {
 
     pub(super) fn emit_func(&self, func: &Function) -> String {
         let mut output = String::new();
-        let params = func.params.iter()
-            .map(|param| format!(
-                "{} {}",
-                param.data_type,
-                self.strtb.get(param.name).unwrap(),
-            ))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let signature = format!(
-            "[{}]\nfn {} ({}) -> {}",
-            func.linkage,
-            self.strtb.get(func.name).unwrap(),
-            if params.is_empty() { "void".to_string() } else { params },
-            func.return_type,
-        );
-        output.push_str(&signature);
-        output.push('\n');
-        output.push_str("code:\n");
-        for insn in &func.body {
-            let prefix = if let Insn::Label(..) = insn {
-                "".to_string()
-            } else {
-                "\t".to_string()
-            };
-            let insn_str = self.emit_insn(insn);
-            output.push_str(&format!("{}{}\n", prefix, insn_str));
-        }
-        output.push_str("\n");
+        match func {
+            Function::Declared { 
+                linkage, 
+                name, 
+                type_ 
+            } => {
+                let return_type = type_.return_type;
+                let name_str = self.strtb.get(*name).unwrap();
+                let param_types = type_.param_types
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let signature = format!(
+                    "[{}]\nfn {}({}) -> {}",
+                    linkage,
+                    name_str,
+                    if param_types.is_empty() { "void".to_string() } else { param_types },
+                    return_type,
+                );
 
-        output.push_str("local vars:\n");
-        for (_, var) in &func.local_vars {
-            let name = self.strtb.get(var.name).unwrap();
-            output.push_str(&format!(
-                "\t{} %{}.{};\n",
-                var.data_type,
+                output.push_str(&signature);
+            },
+            Function::Defined {
+                return_type,
+                linkage,
                 name,
-                var.local_id,
-            ));
-        }
+                params,
+                local_vars,
+                body,
+            } => {
+                let params = params.iter()
+                    .map(|param| format!(
+                        "{} {}",
+                        param.data_type,
+                        self.strtb.get(param.name).unwrap(),
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let signature = format!(
+                    "[{}]\nfn {} ({}) -> {}",
+                    linkage,
+                    self.strtb.get(*name).unwrap(),
+                    if params.is_empty() { "void".to_string() } else { params },
+                    return_type,
+                );
+                output.push_str(&signature);
+                output.push('\n');
+                output.push_str("code:\n");
+                for insn in body {
+                    let prefix = if let Insn::Label(..) = insn {
+                        "".to_string()
+                    } else {
+                        "\t".to_string()
+                    };
+                    let insn_str = self.emit_insn(insn);
+                    output.push_str(&format!("{}{}\n", prefix, insn_str));
+                }
+                output.push_str("\n");
 
+                output.push_str("local vars:\n");
+                for (_, var) in local_vars {
+                    let name = self.strtb.get(var.name).unwrap();
+                    output.push_str(&format!(
+                        "\t{} %{}.{};\n",
+                        var.data_type,
+                        name,
+                        var.local_id,
+                    ));
+                }
+            }
+        }
         output.push('\n');
 
         output

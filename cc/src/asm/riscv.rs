@@ -60,7 +60,51 @@ impl Display for Register {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct RegIter {
+    pub regs: [Register; 32],
+    pub index: usize,
+}
+
+impl Iterator for RegIter {
+    type Item = Register;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.regs.len() {
+            let reg = self.regs[self.index];
+            self.index += 1;
+            Some(reg)
+        } else {
+            None
+        }
+    }
+}
+
 impl Register {
+    pub const ALLOC_REGS: [&Self; 24] = [
+        &Register::A0, &Register::A1, &Register::A2, &Register::A3,
+        &Register::A4, &Register::A5, &Register::A6, &Register::A7,
+        &Register::T0, &Register::T1, &Register::T2, &Register::T3,
+        &Register::T4, &Register::S1, &Register::S2, &Register::S3, 
+        &Register::S4, &Register::S5, &Register::S6, &Register::S7, 
+        &Register::S8, &Register::S9, &Register::S10, &Register::S11,
+    ];
+
+    pub const fn iter() -> RegIter {
+        RegIter {
+            regs: [
+                Register::Zero, Register::Ra, Register::Sp, Register::Gp, Register::Tp,
+                Register::T0, Register::T1, Register::T2, Register::S0, Register::S1,
+                Register::A0, Register::A1, Register::A2, Register::A3, Register::A4,
+                Register::A5, Register::A6, Register::A7, Register::S2, Register::S3,
+                Register::S4, Register::S5, Register::S6, Register::S7, Register::S8,
+                Register::S9, Register::S10, Register::S11, Register::T3, Register::T4,
+                Register::T5, Register::T6,
+            ],
+            index: 0,
+        }
+    }
+
     pub fn x(id: usize) -> Self {
         match id {
             0 => Register::Zero,

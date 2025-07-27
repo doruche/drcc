@@ -343,22 +343,34 @@ impl<'a> CopyPropagation<'a> {
 
 impl CodeGen<Opt> {
     pub fn copy_propagation(&mut self, func: Function) -> Function {
-        let cfg = Graph::build(func.body);
+        match func {
+            Function::Declared {..} => return func,
+            Function::Defined {
+                return_type,
+                linkage,
+                name,
+                params,
+                local_vars,
+                body,
+            } => {
+                let cfg = Graph::build(body);
 
-        let analysis = CopyPropagation::new(&cfg);
-        let result = analysis.analyze();
+                let analysis = CopyPropagation::new(&cfg);
+                let result = analysis.analyze();
 
-        let opted_cfg = rewrite_graph(cfg, &result.block_defs, &result.insn_defs);
+                let opted_cfg = rewrite_graph(cfg, &result.block_defs, &result.insn_defs);
 
-        let mut opted_body = opted_cfg.emit();
+                let mut opted_body = opted_cfg.emit();
 
-        Function {
-            name: func.name,
-            params: func.params,
-            return_type: func.return_type,
-            body: opted_body,
-            linkage: func.linkage,
-            local_vars: func.local_vars,
+                Function::Defined {
+                    name,
+                    params,
+                    return_type,
+                    body: opted_body,
+                    linkage,
+                    local_vars,
+                }
+            }
         }
     }
 }

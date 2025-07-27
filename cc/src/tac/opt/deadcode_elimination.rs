@@ -21,21 +21,33 @@ use super::cfg::{
 
 impl CodeGen<Opt> {
     pub fn deadcode_elimination(&mut self, func: Function) -> Function {
-        let mut cfg = Graph::build(func.body);
+        match func {
+            Function::Declared {..} => return func,
+            Function::Defined {
+                return_type,
+                linkage,
+                name,
+                params,
+                local_vars,
+                body,
+            } => {
+                let mut cfg = Graph::build(body);
 
-        cfg = prune_blocks(cfg);
-        cfg = remove_useless_jumps(cfg);
-        cfg = remove_useless_labels(cfg);
+                cfg = prune_blocks(cfg);
+                cfg = remove_useless_jumps(cfg);
+                cfg = remove_useless_labels(cfg);
 
-        let mut opted_body = cfg.emit();
+                let mut opted_body = cfg.emit();
 
-        Function {
-            name: func.name,
-            params: func.params,
-            return_type: func.return_type,
-            body: opted_body,
-            linkage: func.linkage,
-            local_vars: func.local_vars,
+                Function::Defined {
+                    name,
+                    params,
+                    return_type,
+                    body: opted_body,
+                    linkage,
+                    local_vars,
+                }
+            }
         }
     }
 }
