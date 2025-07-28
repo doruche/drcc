@@ -2,8 +2,10 @@
 The name `drcc` means "doruche's C compiler". The compiler implements a small subset of C language. All the compiler, ranging from lexing and parsing in frontend, IR generation and optimization in middle-end, to RISC-V assembly emission in backend, is written in Rust from scratch, without any dependency on other libraries.
 
 ---
+__注意__
 
-出于一些原因这个项目近乎没办法继续开发了。一个主要问题是缺乏足够全面或者有效的测例，导致我很多时候几乎只能凭感觉编写代码，然后通过自制的一点相当贫瘠的测例来进行验证。总之目前这个编译器或许潜伏着不少神秘的bug也未可知。敬请各位多加小心~~~
+
+出于一些原因这个项目近乎没办法继续开发了。一个主要问题是缺乏足够全面或者有效的测例，导致我很多时候几乎只能凭感觉编写代码，然后通过自制的一点相当贫瘠的测例来进行验证。总之目前这个编译器或许潜伏着不少神秘的bug也未可知。敬请各位多加小心啦~~~
 
 ## Features
 - Tiny subset of C language
